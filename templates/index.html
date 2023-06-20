@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Journal Entry Form</title>
+</head>
+<body>
+    <h1>Journal Entry</h1>
+    <form method="POST" action="/">
+        {{ form.csrf_token }}
+        {% for field in form %}
+            <div>
+                {{ field.label }}
+                {{ field }}
+                {% if field.errors %}
+                    <ul>
+                        {% for error in field.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% endfor %}
+        <input type="submit" value="Submit">
