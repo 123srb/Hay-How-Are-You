@@ -1,11 +1,15 @@
 from flask import Flask, render_template, request, redirect, url_for
 from flask_wtf import FlaskForm
-from wtforms import DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField
+from wtforms import DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField 
 from wtforms.validators import DataRequired, Email, Optional, NumberRange
 import wtforms.validators
 import sqlite3
 from datetime import date
 import json
+from datetime import datetime
+
+
+ 
 
 # Create a Flask application
 app = Flask(__name__)
@@ -21,9 +25,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY, date_ti
 conn.close()
 
 
-#Connect to database
-conn = sqlite3.connect('journal.db')
-c = conn.cursor()
+
 
 #Import the json config file that defines the form entries
 with open('config.json') as f:
@@ -31,6 +33,10 @@ with open('config.json') as f:
 
 #Dynamically generate a form based on the Json file
 def create_form_class(form_fields):
+
+    #Connect to database
+    conn = sqlite3.connect('journal.db', check_same_thread=False)
+    c = conn.cursor()
     #Create empty form
     class DynamicForm(FlaskForm):
         pass
@@ -40,8 +46,17 @@ def create_form_class(form_fields):
         field_type = getattr(wtforms, field_data['type'])
         field_args = {
             'label': field_data['label'],
-            'validators': [getattr(wtforms.validators, v['type'])() for v in field_data['validators']]
+            'validators': [getattr(wtforms.validators, v['type'])() for v in field_data['validators']],
+            'default' : field_data.get('default', None)
         }
+
+    #Check to see if we want to load the previous value as the default 
+        if field_data.get('load_previous_value', None):
+             c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_data['label'],))
+             row = c.fetchone()
+             if row != None:
+                field_args['default'] = row[0]
+                #default_val = row[0]
 
         #We need to seperate Select and Radio fields because they have a choice field 
         if field_data['type'] == 'SelectField' or field_data['type'] == 'RadioField':
@@ -50,19 +65,21 @@ def create_form_class(form_fields):
         #Create field and add to form
         field = field_type(**field_args)
         setattr(DynamicForm, field_name, field)
+    conn.close()
 
     return DynamicForm
  
-conn.close()
 
 @app.route('/', methods=['GET', 'POST'])
 def form():
-
+    message = ''
     
     form = create_form_class(form_fields)()
     print(dir(form))
     if request.method == 'POST':
-
+        # datetime object containing current date and time
+        now = datetime.strftime(datetime.now(), "%Y-%m-%d, %H:%M:%S")
+        
         # Handle form submission
         #data = {}
 
@@ -79,13 +96,15 @@ def form():
         #For every field, if it has a value insert it into the table
         for field in form:
             print(field)
-            if field.name in form and field.data and field.name != 'csrf_token':
+            if field.name in form and field.data  and field.name != 'csrf_token':
                 c = conn.cursor()
                 c.execute("INSERT INTO journal (date_time_stamp, entry, value, value_data_type) VALUES (DATETIME('now', '-10 hours' ), ?, ?,?)", (field.name, field.data, form_fields[field.name]['value_data_type']))
                 conn.commit()
 
         conn.close()
-    return render_template('index.html', form=form)
+        message = 'Data uploaded for: ' + (now)
+
+    return render_template('index.html', form=form, result_message = message)
 
 if __name__ == '__main__':
     app.run()

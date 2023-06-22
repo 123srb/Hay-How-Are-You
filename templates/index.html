@@ -7,7 +7,7 @@
     <h1>Journal Entry</h1>
     <form method="POST" action="/">
         {{ form.csrf_token }}
-        {% for field in form %}
+        {% for field in form if field.widget.input_type != 'hidden' %}
             <div>
                 {{ field.label }}
                 {{ field }}
@@ -21,3 +21,7 @@
             </div>
         {% endfor %}
         <input type="submit" value="Submit">
+
+        <p>{{ result_message }}</p>
+</body>
+</html>
