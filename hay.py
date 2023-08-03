@@ -6,7 +6,7 @@ import wtforms.validators
 import sqlite3
 from datetime import date
 import json
-from datetime import datetime
+from datetime import datetime, date
 
 
  
@@ -88,9 +88,15 @@ def form():
         c = conn.cursor()
         c.execute("SELECT COUNT(*) FROM journal WHERE DATE(date_time_stamp) = DATE(DATETIME('now', '-10 hours' ) )  LIMIT 1")
         is_entry = c.fetchone()
+   
         if is_entry[0] > 0:
-            print(is_entry)
-            c.execute("DELETE FROM journal WHERE DATE(date_time_stamp) = DATE(DATETIME('now', ' -10 hours' ) )")
+            print('here')
+            #print(is_entry)
+            today = date.today()
+            print(today)
+            delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date({today})"
+            c.execute(delete_query)
+            #c.execute("DELETE FROM journal WHERE DATE(date_time_stamp) = DATE(DATETIME('now', ' -10 hours' ) )")
             conn.commit()
           
         #For every field, if it has a value insert it into the table
@@ -103,8 +109,8 @@ def form():
 
         conn.close()
         message = 'Data uploaded for: ' + (now)
-
-    return render_template('index.html', form=form, result_message = message)
+    trend_dict = {'Day Quality': 9.0, 'Work Stress': 0.0, 'Meditation': 7.0, 'Creativity': 4.0, 'Energy': 0.0}
+    return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict)
 
 if __name__ == '__main__':
     app.run()

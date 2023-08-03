@@ -5,12 +5,17 @@
 </head>
 <body>
     <h1>Journal Entry</h1>
+
+    <table>
     <form method="POST" action="/">
         {{ form.csrf_token }}
         {% for field in form if field.widget.input_type != 'hidden' %}
-            <div>
-                {{ field.label }}
-                {{ field }}
+            <tr>
+                <th>{{ field.label }}</th>
+                <th>{{ field }}</th> 
+                <th>{{trend_dict[field.label.text]}}</th>
+            
+
                 {% if field.errors %}
                     <ul>
                         {% for error in field.errors %}
@@ -18,8 +23,12 @@
                         {% endfor %}
                     </ul>
                 {% endif %}
-            </div>
+
+                </tr>
         {% endfor %}
+
+    </table>
+
         <input type="submit" value="Submit">
 
         <p>{{ result_message }}</p>
