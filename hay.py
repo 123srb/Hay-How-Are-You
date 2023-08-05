@@ -90,18 +90,18 @@ def form():
         is_entry = c.fetchone()
    
         if is_entry[0] > 0:
-            print('here')
-            #print(is_entry)
+            print('here---------------------------------------------------------------------')
+            print(is_entry)
             today = date.today()
             print(today)
-            delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date({today})"
+            delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date('{today}')"
             c.execute(delete_query)
             #c.execute("DELETE FROM journal WHERE DATE(date_time_stamp) = DATE(DATETIME('now', ' -10 hours' ) )")
             conn.commit()
           
         #For every field, if it has a value insert it into the table
         for field in form:
-            print(field)
+            #print(field)
             if field.name in form and field.data  and field.name != 'csrf_token':
                 c = conn.cursor()
                 c.execute("INSERT INTO journal (date_time_stamp, entry, value, value_data_type) VALUES (DATETIME('now', '-10 hours' ), ?, ?,?)", (field.name, field.data, form_fields[field.name]['value_data_type']))
@@ -109,6 +109,8 @@ def form():
 
         conn.close()
         message = 'Data uploaded for: ' + (now)
+    else:
+        pass
     trend_dict = {'Day Quality': 9.0, 'Work Stress': 0.0, 'Meditation': 7.0, 'Creativity': 4.0, 'Energy': 0.0}
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict)
 
