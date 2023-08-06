@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for
 from flask_wtf import FlaskForm
-from wtforms import DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField 
+from wtforms import DateField, DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField 
 from wtforms.validators import DataRequired, Email, Optional, NumberRange
 import wtforms.validators
 import sqlite3
@@ -66,6 +66,8 @@ def create_form_class(form_fields):
         field = field_type(**field_args)
         setattr(DynamicForm, field_name, field)
     conn.close()
+    setattr(DynamicForm, 'Select Date',  DateField('Select Date', default=date.today))
+ 
 
     return DynamicForm
  
@@ -90,10 +92,9 @@ def form():
         is_entry = c.fetchone()
    
         if is_entry[0] > 0:
-            print('here---------------------------------------------------------------------')
-            print(is_entry)
+
             today = date.today()
-            print(today)
+           
             delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date('{today}')"
             c.execute(delete_query)
             #c.execute("DELETE FROM journal WHERE DATE(date_time_stamp) = DATE(DATETIME('now', ' -10 hours' ) )")
