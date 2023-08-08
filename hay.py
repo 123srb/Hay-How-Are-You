@@ -21,7 +21,8 @@ conn = sqlite3.connect('journal.db')
 c = conn.cursor()
 
 # Create table if it does not exist
-c.execute('''CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY, date_time_stamp TEXT, entry TEXT, value TEXT, value_data_type)''')
+c.execute('''CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY, date_time_stamp TEXT, for_date TEXT, entry TEXT, value TEXT, value_data_type)''')
+
 conn.close()
 
 
@@ -66,6 +67,8 @@ def create_form_class(form_fields):
         field = field_type(**field_args)
         setattr(DynamicForm, field_name, field)
     conn.close()
+
+    #Regardless of what's in the form we're going to include a date selection in case there is a late entry.  Editing need to come later
     setattr(DynamicForm, 'Select Date',  DateField('Select Date', default=date.today))
  
 
@@ -77,39 +80,40 @@ def form():
     message = ''
     
     form = create_form_class(form_fields)()
-    print(dir(form))
+    #print(dir(form))
     if request.method == 'POST':
         # datetime object containing current date and time
         now = datetime.strftime(datetime.now(), "%Y-%m-%d, %H:%M:%S")
-        
-        # Handle form submission
-        #data = {}
-
+    
         #connect to the db and check if there is an entry for today.  If there is delete it and insert the current values
         conn = sqlite3.connect('journal.db')        
         c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM journal WHERE DATE(date_time_stamp) = DATE(DATETIME('now', '-10 hours' ) )  LIMIT 1")
-        is_entry = c.fetchone()
-   
-        if is_entry[0] > 0:
 
-            today = date.today()
-           
-            delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date('{today}')"
+  
+        #check to see if the submitted date is different from today, if it is, delete the entry from that day
+        #the entry will have the date time stamp it was submitted on and the submitted date will be the day it is for
+        submitted_date = getattr(getattr(form, 'Select Date'), 'data')
+        if submitted_date != date.today():
+            
+            delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date('{submitted_date}')"
+            c.execute(delete_query)   
+        else: 
+            delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date('{date.today()}')"
             c.execute(delete_query)
-            #c.execute("DELETE FROM journal WHERE DATE(date_time_stamp) = DATE(DATETIME('now', ' -10 hours' ) )")
-            conn.commit()
-          
+             #conn.commit()
+
+
         #For every field, if it has a value insert it into the table
         for field in form:
             #print(field)
-            if field.name in form and field.data  and field.name != 'csrf_token':
+            if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'Select Date':
                 c = conn.cursor()
-                c.execute("INSERT INTO journal (date_time_stamp, entry, value, value_data_type) VALUES (DATETIME('now', '-10 hours' ), ?, ?,?)", (field.name, field.data, form_fields[field.name]['value_data_type']))
+                c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),submitted_date,field.name, field.data, form_fields[field.name]['value_data_type']))
                 conn.commit()
 
+
         conn.close()
-        message = 'Data uploaded for: ' + (now)
+        message = 'Data uploaded for: ' + str(submitted_date)
     else:
         pass
     trend_dict = {'Day Quality': 9.0, 'Work Stress': 0.0, 'Meditation': 7.0, 'Creativity': 4.0, 'Energy': 0.0}
