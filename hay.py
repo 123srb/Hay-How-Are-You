@@ -1,3 +1,5 @@
+import sys
+sys.path.append('/inc')
 from flask import Flask, render_template, request, redirect, url_for
 from flask_wtf import FlaskForm
 from wtforms import DateField, DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField 
@@ -7,8 +9,7 @@ import sqlite3
 from datetime import date
 import json
 from datetime import datetime, date
-
-
+from inc.analysis_functions import *
  
 
 # Create a Flask application
@@ -93,14 +94,10 @@ def form():
         #check to see if the submitted date is different from today, if it is, delete the entry from that day
         #the entry will have the date time stamp it was submitted on and the submitted date will be the day it is for
         submitted_date = getattr(getattr(form, 'Select Date'), 'data')
-        if submitted_date != date.today():
-            
-            delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date('{submitted_date}')"
-            c.execute(delete_query)   
-        else: 
-            delete_query = f"DELETE FROM journal WHERE DATE(date_time_stamp) = Date('{date.today()}')"
-            c.execute(delete_query)
-             #conn.commit()
+  
+        delete_query = f"DELETE FROM journal WHERE for_date = '{submitted_date}'"
+        c.execute(delete_query)   
+ 
 
 
         #For every field, if it has a value insert it into the table
@@ -116,7 +113,9 @@ def form():
         message = 'Data uploaded for: ' + str(submitted_date)
     else:
         pass
-    trend_dict = {'Day Quality': 9.0, 'Work Stress': 0.0, 'Meditation': 7.0, 'Creativity': 4.0, 'Energy': 0.0}
+    #trend_dict = {'Day Quality': 9.0, 'Work Stress': 0.0, 'Meditation': 7.0, 'Creativity': 4.0, 'Energy': 0.0}
+    trend_dict = get_trending_dictionary()
+    print(trend_dict)
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict)
 
 if __name__ == '__main__':

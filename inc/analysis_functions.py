@@ -1,0 +1,59 @@
+import sqlite3
+import pandas as pd
+from datetime import datetime, timedelta, date
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
+
+def get_trending_dictionary():
+    #dict to store our results
+    result_dict = {}   
+        
+    # Connect to the SQLite database
+    conn = sqlite3.connect('journal.db')
+    cursor = conn.cursor()
+
+    from datetime import datetime
+    fourteen_days_ago = datetime.today().strftime('%Y-%m-%d')
+
+    from datetime import date, timedelta
+
+    #current_date = date.today().isoformat()   
+    
+    # Define the SQL query to select all columns from the table
+    sql_query = f"SELECT * FROM journal WHERE for_date >= '{(date.today()-timedelta(days=14)).isoformat()}'"
+
+
+    # Get the data from the database using pandas
+    df = pd.read_sql_query(sql_query, conn)
+
+    df['date'] = pd.to_datetime(df['date_time_stamp']).dt.date 
+    df['date_time_stamp'] = pd.to_datetime(df['date_time_stamp'])
+
+    #Make sure all values are in an Integer or Binary format
+    df = df[df['value_data_type'].isin(['Integer','Binary'])]
+
+    #Get all unique variable names in the data frame
+    variable_names = df.entry.unique()
+    print(df)
+    for name in variable_names:
+        #filter df for one specific entry
+        df_var = df[df['entry']==name]
+
+        df_var = df_var.sort_values(by='date_time_stamp', ascending= True).reset_index(drop=True)
+        df_var['date_var'] = df_var.index
+
+        #perform a linear regression to get the slope of the line, use that for trending 
+        x = df_var[['date_var']]
+        y = df_var['value'] 
+
+        model = LinearRegression()
+        model.fit(x,y)
+        slope = model.coef_[0]
+        result_dict[name] = slope
+
+        
+    print(result_dict)
+    return(result_dict)
+
+print(get_trending_dictionary())
