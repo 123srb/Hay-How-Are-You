@@ -2,8 +2,7 @@ import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta, date
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import MinMaxScaler
-import numpy as np
+
 
 def get_trending_dictionary():
     #dict to store our results
@@ -12,13 +11,6 @@ def get_trending_dictionary():
     # Connect to the SQLite database
     conn = sqlite3.connect('journal.db')
     cursor = conn.cursor()
-
-    from datetime import datetime
-    fourteen_days_ago = datetime.today().strftime('%Y-%m-%d')
-
-    from datetime import date, timedelta
-
-    #current_date = date.today().isoformat()   
     
     # Define the SQL query to select all columns from the table
     sql_query = f"SELECT * FROM journal WHERE for_date >= '{(date.today()-timedelta(days=14)).isoformat()}'"
@@ -50,10 +42,7 @@ def get_trending_dictionary():
         model = LinearRegression()
         model.fit(x,y)
         slope = model.coef_[0]
-        result_dict[name] = slope
+        result_dict[name] = round(slope,3)
 
-        
-    print(result_dict)
-    return(result_dict)
+        return(result_dict)
 
-print(get_trending_dictionary())
