@@ -22,7 +22,7 @@ conn = sqlite3.connect('journal.db')
 c = conn.cursor()
 
 # Create table if it does not exist
-c.execute('''CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY, date_time_stamp TEXT, for_date TEXT, entry TEXT, value TEXT, value_data_type)''')
+c.execute('''CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY, date_time_stamp TEXT, for_date TEXT, entry TEXT, value TEXT, value_data_type TEXT)''')
 
 conn.close()
 
@@ -113,7 +113,7 @@ def form():
         message = 'Data uploaded for: ' + str(submitted_date)
     else:
         pass
-    #trend_dict = {'Day Quality': 9.0, 'Work Stress': 0.0, 'Meditation': 7.0, 'Creativity': 4.0, 'Energy': 0.0}
+
     trend_dict = get_trending_dictionary()
     print(trend_dict)
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict)
