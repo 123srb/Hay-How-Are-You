@@ -1,50 +1,56 @@
 from os import path
-from cryptography.fernet import Fernet
+import pandas as pd
+from cryptography.fernet import Fernet, InvalidToken
+
 
 def generate():
     key = Fernet.generate_key()
     with open(path.expanduser('~\\Documents') + '\\universal.key',"wb") as key_files:
         key_files.write(key)
 
+def check_key():
+    if path.isfile(path.expanduser('~\\Documents') + '\\universal.key'):
+        pass
+    else:
+        generate()
+
 def loadKey():
     key = open(path.expanduser('~\\Documents') + '\\universal.key',"rb").read()
     return key
 
-def Encrypt(secret):
+def encrypt_df(df, columns):
     key = loadKey()
-    encodeSecret = secret.encode()
-    fer  = Fernet(key)
-    return fer.encrypt(encodeSecret)
+    f= Fernet(key)
+    for column in columns:
+        # Encrypt each column supplied
+        df[column] = df[column].apply(lambda x: f.encrypt(str(x).encode()).decode())
+    return df
 
-def Decrypt(encryptSecret):
-    key = loadKey()
-    fer  = Fernet(key)
-    decryptSecret = fer.decrypt(encryptSecret)
-    return decryptSecret.decode()
 
-def encrpyt_df(df):
+def decrypt_df(df, columns):
     key = loadKey()
-    f = Fernet(key)
-    df1 = df.applymap(lambda x: bytes(x[2:-1],'utf-8'))
-    df2 = df1.applymap(lambda x: f.decrypt(x))
-    df_decrp = df2.applymap(lambda x: x.decode('utf-8'))
-    return df_decrp
-
-def decrypt_df(df):
-    key = loadKey()
-    f = Fernet(key)
-    df = df.apply(lambda x: x.astype(str)) # preprocess
-    df_encp = df.applymap(lambda x: f.encrypt(x.encode('utf-8')))
-    return df_encp
+    f= Fernet(key)
+    for column in columns:
+        print(column)
+        df[column] = df[column].apply(lambda x: str(f.decrypt(x.encode()).decode()))
+    return df
     
-def decrypt_item(item):
+def decrypt_value(encrypted_value):
     key = loadKey()
     f = Fernet(key)
-    decryptSecret = f.decrypt(item)
-    return item.decode()
+    decrypted_text = f.decrypt(encrypted_value).decode()
+    return decrypted_text
 
-def encrypt_item(item):
+def encrypt_value(value):
     key = loadKey()
-    encodeSecret = item.encode()
     f = Fernet(key)
-    return f.encrypt(encodeSecret)
+    if isinstance(value, int) or isinstance(value,float):
+        value = str(value)
+    encrypted_text = f.encrypt(value.encode())
+    return encrypted_text
+
+va = 'lkjsldkjf'
+
+aa = encrypt_value(va)
+print(aa)
+print(decrypt_value(aa))

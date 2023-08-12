@@ -9,8 +9,12 @@ import sqlite3
 from datetime import date
 import json
 from datetime import datetime, date
-from inc.analysis_functions import *
- 
+import inc.analysis_functions as af
+import inc.encryption_functions as ef
+import pandas as pd
+
+#Check to make sure we have an encryption key, if not, it will make one
+ef.check_key()
 
 # Create a Flask application
 app = Flask(__name__)
@@ -43,6 +47,12 @@ def create_form_class(form_fields):
     class DynamicForm(FlaskForm):
         pass
 
+    latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
+
+    # Get the data from the database using pandas
+    latest_data = pd.read_sql_query(latest_query, conn)
+    latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
+
     #Iterate though the config file and define the fomr
     for field_name, field_data in form_fields.items():
         field_type = getattr(wtforms, field_data['type'])
@@ -54,6 +64,7 @@ def create_form_class(form_fields):
 
     #Check to see if we want to load the previous value as the default 
         if field_data.get('load_previous_value', None):
+
              c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_data['label'],))
              row = c.fetchone()
              if row != None:
@@ -105,7 +116,7 @@ def form():
             #print(field)
             if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'Select Date':
                 c = conn.cursor()
-                c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),submitted_date,field.name, field.data, form_fields[field.name]['value_data_type']))
+                c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),submitted_date,ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(form_fields[field.name]['value_data_type'])))
                 conn.commit()
 
 
@@ -114,7 +125,7 @@ def form():
     else:
         pass
 
-    trend_dict = get_trending_dictionary()
+    trend_dict = af.get_trending_dictionary()
     print(trend_dict)
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict)
 
