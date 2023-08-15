@@ -2,6 +2,7 @@ from os import path
 import pandas as pd
 from cryptography.fernet import Fernet, InvalidToken
 
+import sqlite3
 
 def generate():
     key = Fernet.generate_key()
@@ -32,7 +33,7 @@ def decrypt_df(df, columns):
     f= Fernet(key)
     for column in columns:
         print(column)
-        df[column] = df[column].apply(lambda x: str(f.decrypt(x.encode()).decode()))
+        df[column] = df[column].apply(lambda x: str(f.decrypt(x).decode()))
     return df
     
 def decrypt_value(encrypted_value):
@@ -49,8 +50,3 @@ def encrypt_value(value):
     encrypted_text = f.encrypt(value.encode())
     return encrypted_text
 
-va = 'lkjsldkjf'
-
-aa = encrypt_value(va)
-print(aa)
-print(decrypt_value(aa))
