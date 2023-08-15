@@ -32,13 +32,12 @@ conn.close()
 
 
 
-
 #Import the json config file that defines the form entries
 with open('config.json') as f:
     form_fields = json.load(f)
 
 #Dynamically generate a form based on the Json file
-def create_form_class(form_fields):
+def create_form_class(form_fields, date_to_load):
 
     #Connect to database
     conn = sqlite3.connect('journal.db', check_same_thread=False)
@@ -63,7 +62,10 @@ def create_form_class(form_fields):
         }
 
     #Check to see if we want to load the previous value as the default 
-        if field_data.get('load_previous_value', None):
+        if date_to_load != '':
+            pass
+        
+        elif field_data.get('load_previous_value', None):
 
              c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_data['label'],))
              row = c.fetchone()
@@ -81,17 +83,35 @@ def create_form_class(form_fields):
     conn.close()
 
     #Regardless of what's in the form we're going to include a date selection in case there is a late entry.  Editing need to come later
-    setattr(DynamicForm, 'Select Date',  DateField('Select Date', default=date.today))
- 
+    print(date_to_load)
+    print(date.today)
+    if date_to_load != '': 
+        default_date=date_to_load
+        print(1)
+    else: 
+        default_date=date.today
+        print(2)
+    print(default_date)
+
+    setattr(DynamicForm, 'selected_date',  DateField('selected_date', default=default_date, render_kw={"class": "form-control"}))
+
 
     return DynamicForm
  
 
+
 @app.route('/', methods=['GET', 'POST'])
 def form():
     message = ''
-    
-    form = create_form_class(form_fields)()
+    if request.args.get('selected_date'):
+        raw_date = request.args.get('selected_date')
+        selected_date = datetime.strptime(raw_date, '%Y-%m-%d')  # Convert string to datetime
+         
+        
+    else:
+        selected_date=''
+
+    form = create_form_class(form_fields, date_to_load=selected_date)()
     #print(dir(form))
     if request.method == 'POST':
         # datetime object containing current date and time
@@ -104,7 +124,7 @@ def form():
   
         #check to see if the submitted date is different from today, if it is, delete the entry from that day
         #the entry will have the date time stamp it was submitted on and the submitted date will be the day it is for
-        submitted_date = getattr(getattr(form, 'Select Date'), 'data')
+        submitted_date = getattr(getattr(form, 'selected_date'), 'data')
   
         delete_query = f"DELETE FROM journal WHERE for_date = '{submitted_date}'"
         c.execute(delete_query)   
@@ -114,7 +134,7 @@ def form():
         #For every field, if it has a value insert it into the table
         for field in form:
             #print(field)
-            if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'Select Date':
+            if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date':
                 c = conn.cursor()
                 c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),submitted_date,ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(form_fields[field.name]['value_data_type'])))
                 conn.commit()
@@ -126,7 +146,7 @@ def form():
         pass
 
     trend_dict = af.get_trending_dictionary()
-    print(trend_dict)
+    #print(trend_dict)
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict)
 
 if __name__ == '__main__':

@@ -25,7 +25,7 @@ def get_trending_dictionary():
     #df['date'] = pd.to_datetime(df['date_time_stamp']).dt.date 
     #df['date_time_stamp'] = pd.to_datetime(df['date_time_stamp'])
 
-    print(df)
+ 
     #Make sure all values are in an Integer or Binary format
     df = df[df['value_data_type'].isin(['Integer','Binary'])]
 
