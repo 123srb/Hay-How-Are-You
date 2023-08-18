@@ -5,17 +5,18 @@
 
 
     <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      const dateInput = document.getElementById("selected_date");
-      
-      dateInput.addEventListener("change", function() {
-        const selectedDate = dateInput.value;
-        // Incorrect usage of url_for, causing the error
-        const url = `{{ url_for('form') }}?selected_date=${selectedDate}`;
-    window.location.href = url;
-      });
-    });
-    </script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const dateInput = document.getElementById("selected_date");
+              
+            dateInput.addEventListener("change", function() {
+                const selectedDate = dateInput.value;
+                const baseUrl = window.location.href.split('?')[0];  // Get the base URL without query parameters
+                const url = `${baseUrl}?selected_date=${selectedDate}`;
+                window.location.href = url;
+            });
+        });
+        </script>
+        
     
         
 </head>
@@ -42,10 +43,15 @@
 
                 </tr>
         {% endfor %}
-
+        <tr>
+            <td colspan="3">
+                <input type="submit" value="Submit">
+            </td>
+        </tr>
+        
+    </form>
+    
     </table>
-
-        <input type="submit" value="Submit">
 
         <p>{{ result_message }}</p>
 

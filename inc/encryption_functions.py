@@ -32,7 +32,6 @@ def decrypt_df(df, columns):
     key = loadKey()
     f= Fernet(key)
     for column in columns:
-        print(column)
         df[column] = df[column].apply(lambda x: str(f.decrypt(x).decode()))
     return df
     
