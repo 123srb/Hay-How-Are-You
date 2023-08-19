@@ -46,39 +46,31 @@ def create_form_class(form_fields, date_to_load):
         pass
     #Basic logic we're going for. If there aren't any entries for that day, load everything like a normal day
     #If there is an entry, we go through each of the entry names and see if it is in our config file
-    #Then we load only those that are in the config file
+    #Then we load only those that are in the config file, query that day of data, decrypt and delete those rows
+    #reupload that data without the rows, then insert the data from our form
     print('------------------------------------------------')
     print('date to load = ' + str(date_to_load))
     if date_to_load:
 
         date_to_load_query = f"SELECT * FROM journal WHERE for_date = '{date_to_load.strftime('%Y-%m-%d')}'"
-        #print(date_to_load_query)
         date_to_load_data = pd.read_sql_query(date_to_load_query, conn)
-        #print('date to load: ' + str(date_to_load))
-        print(1111111111111111111)
+  
 
         if not date_to_load_data.empty:
-            print('222222222222222222 ' + str(date_to_load))
             #load data from the specified day into a df
             date_to_load_data = ef.decrypt_df(date_to_load_data, ['entry','value','value_data_type'])
             date_to_load_columns = date_to_load_data.entry.unique()
-           # print('there is data to load for this day')
         else:
-            print('33333333333333333333')
         # Get the data from the database using pandas
             latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
             latest_data = pd.read_sql_query(latest_query, conn)
             latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
-            #print('there is no data, time to use the defaults')
         
     else:
-        print(444444444444444444444444444)
     # Get the data from the database using pandas
         latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
         latest_data = pd.read_sql_query(latest_query, conn)
         latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
-        #print('there is no data, time to use the defaults')
-
 
     print('date_to_load_columns: ' + str(date_to_load_columns))
    
@@ -113,7 +105,8 @@ def create_form_class(form_fields, date_to_load):
             setattr(DynamicForm, field_name, field)
     conn.close()
 
-    #Regardless of what's in the form we're going to include a date selection
+    #Regardless of what's in the form we're going to include a date selection.  Populate it with a date if we selected one
+    #or default to today
 
     if date_to_load: 
         default_date=date_to_load
@@ -122,18 +115,16 @@ def create_form_class(form_fields, date_to_load):
 
     print('date to load is: ' + str(date_to_load))
     print('default date is: ' + str(default_date))
-    #setattr(DynamicForm, 'selected_date',  DateField('selected_date', default=default_date, render_kw={"class": "form-control"}))
+
     date_field_args = {
         'default': default_date,
         'render_kw': {"class": "form-control"}  # Add the class attribute here
     }
     setattr(DynamicForm, 'selected_date', DateField('selected_date', **date_field_args))
 
-
+    #we'll use the date to load columns values to find what values we should delete
     return DynamicForm, date_to_load_columns
  
-
-
 @app.route('/', methods=['GET', 'POST'])
 def form():
 
@@ -141,42 +132,24 @@ def form():
     #create an empty variable to add a message to submit to user
     message = ''
 
-    #check to see if a data was selected to pass it to the form creation function
-    #selected_date=None
-
+    #check get, and then the form for the selected date, if neither are set default to todays date
 
     if request.args.get('selected_date'):
         
         raw_date = request.args.get('selected_date')
-        selected_date = datetime.strptime(raw_date, '%Y-%m-%d')  # Convert string to datetime    
-        #selected_date = selected_date.strftime('%Y-%m-%d') 
-        print('raw date: ' + str(raw_date))  
+        selected_date = datetime.strptime(raw_date, '%Y-%m-%d')  # Convert string to datetime  
+
     elif request.form.get('selected_date'):
+
         selected_date = datetime.strptime(request.form.get('selected_date'), '%Y-%m-%d') 
-        print('get date: ' +  str(selected_date))
   
     else:
         selected_date = date.today()
-        print('todays date')
 
-    #if request.method == 'POST' and getattr(getattr(form, 'selected_date'), 'data')  :
-     #   selected_date = getattr(getattr(form, 'selected_date'), 'data')  
-    #    print('Selected date from POST: ' + str(selected_date))
 
-    #print('request form get: ' + str(request.form.get('selected_date')))
-    #form, columns_to_update = create_form_class(form_fields, date_to_load=selected_date)()
     dynamic_form_class, columns_to_delete= create_form_class(form_fields, date_to_load=selected_date)
     form = dynamic_form_class(request.form)
-    print('columns to delete: ' + str(columns_to_delete))
-    print(selected_date)
-    #if request.method == 'POST':
-    #    selected_date = getattr(getattr(form, 'selected_date'), 'data')  
-    #    print('Selected date from POST: ' + str(selected_date))
-   # else:
-   #     selected_date=None
-   #     print('Selected date is: ' + str(selected_date))
 
-    #print(dir(form))
     if request.method == 'POST':
         # datetime object containing current date and time
         now = datetime.strftime(datetime.now(), "%Y-%m-%d, %H:%M:%S")
@@ -184,33 +157,26 @@ def form():
         #connect to the db and check if there is an entry for today.  If there is delete it and insert the current values
         conn = sqlite3.connect('journal.db')        
         c = conn.cursor()
-        print("Raw POST data:", request.data)
   
-        #check to see if the submitted date is different from today, if it is, delete the entry from that day
-        #the entry will have the date time stamp it was submitted on and the submitted date will be the day it is for
+        #first query the rows for our day
         df_to_delete_rows_query = f"SELECT * FROM journal WHERE for_date = '{selected_date.strftime('%Y-%m-%d')}'"
-        
         df_to_delete_rows = pd.read_sql_query(df_to_delete_rows_query, conn)
+
+        #decrypt the df and drop the columns that are currently editable in our config file, delete all of that day
+        # ', leave the rest alone and ureupload it
         decrypted_df = ef.decrypt_df(df_to_delete_rows, ['entry','value','value_data_type'])
-        #print(date_to_load_query)
-        print('dddddddddddddddddddddddddddddddd')
         decrypted_df_reupload = decrypted_df.drop(decrypted_df[decrypted_df['entry'].isin(columns_to_delete)].index)
         enrypted_df_reupload = ef.encrypt_df(decrypted_df_reupload, ['entry','value','value_data_type'])
-        print('decrypted_df_upload:') 
-        print(decrypted_df_reupload)
-        print('-------------submitted date: ' + str(selected_date))
         delete_query = f"DELETE FROM journal WHERE for_date = '{selected_date.date()}'"
-        print('delete query: ' + str(delete_query))
         c.execute(delete_query)   
- 
         enrypted_df_reupload.to_sql('journal', conn, if_exists='append', index=False)
         conn.commit()
 
-        #For every field, if it has a value insert it into the tablel..
         for field in form:
-            if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and field.name in (columns_to_delete):
-                print(field.name)
-                print(field.data)
+            #check if the values name is in the form, and there is data for it.  
+            #csrf token gets automatically passed so we dont want that or our selected date because we use that for the field
+            #finally this last if is to check if the field name is one of the columns we deleted for editing a day or has no information as in a new day
+            if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and (field.name in columns_to_delete or not columns_to_delete) :
                 c = conn.cursor()
                 row_insert_query = f"INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES ({str(datetime.now())}, {selected_date}.date(), {ef.encrypt_value(field.name)},{ef.encrypt_value(field.data)},{ef.encrypt_value(form_fields[field.name]['value_data_type'])})"
                 print('row insert query: ' + str(row_insert_query))
@@ -222,9 +188,8 @@ def form():
         message = 'Data uploaded for: ' + str(selected_date)
     else:
         pass
-
+    #get the value for how each number valued has be trending up of down
     trend_dict = af.get_trending_dictionary()
-    #print(trend_dict)
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict, selected_date = selected_date)
 
 if __name__ == '__main__':
