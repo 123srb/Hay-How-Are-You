@@ -7,6 +7,17 @@ from datetime import datetime, timedelta, date
 from sklearn.linear_model import LinearRegression
 import inc.encryption_functions as ef
 
+def get_x_days_data(num_days):
+
+    conn = sqlite3.connect('journal.db')
+    cursor = conn.cursor()
+    sql_query = f"SELECT * FROM journal WHERE for_date >= '{(date.today()-timedelta(days=14)).isoformat()}'"
+    # Get the data from the database using pandas
+    df = pd.read_sql_query(sql_query, conn)
+    df = ef.decrypt_df(df, ['entry','value','value_data_type'])
+    conn.close()
+    return df
+
 def get_trending_dictionary():
     #dict to store our results
     result_dict = {}   
@@ -25,7 +36,6 @@ def get_trending_dictionary():
     #df['date'] = pd.to_datetime(df['date_time_stamp']).dt.date 
     #df['date_time_stamp'] = pd.to_datetime(df['date_time_stamp'])
 
- 
     #Make sure all values are in an Integer or Binary format
     df = df[df['value_data_type'].isin(['Integer','Binary'])]
 
@@ -49,5 +59,46 @@ def get_trending_dictionary():
         result_dict[name] = round(slope,3)
 
     return(result_dict)
+def create_graph(df):
+        
+    df['date'] = pd.to_datetime(df['date_time_stamp']).dt.date
+    df = df.pivot(index='date', columns='entry', values='value')
+    #df = df.reset_index()
+
+    # Get the list of variable names
+    var_names = df.columns.tolist()
+
+    @app.route('/', methods=['GET', 'POST'])
+    def index():
+        if request.method == 'POST':
+            # Get the selected variable from the form data
+            selected_var = request.form['variable']
+            if form_config[selected_var]['value_data_type'] == 'Integer':
+                df[selected_var] = df[selected_var].fillna(0).astype(int)
+            # Create a line plot using seaborn
+            fig = plt.figure()
+            sns.lineplot(x='date', y=selected_var, data=df)
+            plt.xlabel('Date')
+            plt.ylabel(selected_var)
+            plt.title('Line Plot of {}'.format(selected_var))
+            plt.tight_layout()
+            plt.savefig('static/plot.png')
+            
+            # Render the HTML template with the plot image
+            return render_template('index.html', var_names=var_names)
+        else:
+            # Get the selected variable from the form data
+            selected_var = 'Day Quality'
+            df[selected_var] = df[selected_var].fillna(0).astype(int)
+            # Create a line plot using seaborn
+            fig = plt.figure()
+            sns.lineplot(x='date', y=selected_var, data=df)
+            plt.xlabel('Date')
+            plt.ylabel(selected_var)
+            plt.title('Line Plot of {}'.format(selected_var))
+            plt.tight_layout()
+            plt.savefig('static/plot.png')
+        # If the request method is GET, render the HTML template with the form
+            return render_template('index.html', var_names=var_names)
 
 get_trending_dictionary()
