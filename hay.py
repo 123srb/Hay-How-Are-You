@@ -54,17 +54,16 @@ def create_form_class(form_fields, date_to_load):
 
         date_to_load_query = f"SELECT * FROM journal WHERE for_date = '{date_to_load.strftime('%Y-%m-%d')}'"
         date_to_load_data = pd.read_sql_query(date_to_load_query, conn)
-  
 
         if not date_to_load_data.empty:
             #load data from the specified day into a df
             date_to_load_data = ef.decrypt_df(date_to_load_data, ['entry','value','value_data_type'])
             date_to_load_columns = date_to_load_data.entry.unique()
-        else:
+    #   else:
         # Get the data from the database using pandas
-            latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
-            latest_data = pd.read_sql_query(latest_query, conn)
-            latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
+    #        latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
+    #        latest_data = pd.read_sql_query(latest_query, conn)
+     #       latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
         
     else:
     # Get the data from the database using pandas
@@ -125,10 +124,11 @@ def create_form_class(form_fields, date_to_load):
     #we'll use the date to load columns values to find what values we should delete
     return DynamicForm, date_to_load_columns
  
-@app.route('/', methods=['GET', 'POST'])
-def form():
 
-    print('FOOOOOOOOOORRRRRRRRRRRRRRRRRMMMMMMMMMMMMMMMMMMMMMMMMM')
+
+@app.route('/', methods=['GET', 'POST'])
+
+def form():
     #create an empty variable to add a message to submit to user
     message = ''
 

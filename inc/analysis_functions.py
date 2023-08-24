@@ -6,12 +6,15 @@ import pandas as pd
 from datetime import datetime, timedelta, date
 from sklearn.linear_model import LinearRegression
 import inc.encryption_functions as ef
+from flask import render_template, request
+import matplotlib.pyplot as plt
+
 
 def get_x_days_data(num_days):
-
+# Connect to the SQLite database
     conn = sqlite3.connect('journal.db')
     cursor = conn.cursor()
-    sql_query = f"SELECT * FROM journal WHERE for_date >= '{(date.today()-timedelta(days=14)).isoformat()}'"
+    sql_query = f"SELECT * FROM journal WHERE for_date >= '{(date.today()-timedelta(days=num_days)).isoformat()}'"
     # Get the data from the database using pandas
     df = pd.read_sql_query(sql_query, conn)
     df = ef.decrypt_df(df, ['entry','value','value_data_type'])
@@ -21,22 +24,8 @@ def get_x_days_data(num_days):
 def get_trending_dictionary():
     #dict to store our results
     result_dict = {}   
-        
-    # Connect to the SQLite database
-    conn = sqlite3.connect('journal.db')
-    cursor = conn.cursor()
+    df = get_x_days_data(14)   
     
-    # Define the SQL query to select all columns from the table
-    sql_query = f"SELECT * FROM journal WHERE for_date >= '{(date.today()-timedelta(days=14)).isoformat()}'"
-
-
-    # Get the data from the database using pandas
-    df = pd.read_sql_query(sql_query, conn)
-    df = ef.decrypt_df(df, ['entry','value','value_data_type'])
-    #df['date'] = pd.to_datetime(df['date_time_stamp']).dt.date 
-    #df['date_time_stamp'] = pd.to_datetime(df['date_time_stamp'])
-
-    #Make sure all values are in an Integer or Binary format
     df = df[df['value_data_type'].isin(['Integer','Binary'])]
 
     #Get all unique variable names in the data frame
@@ -59,6 +48,7 @@ def get_trending_dictionary():
         result_dict[name] = round(slope,3)
 
     return(result_dict)
+
 def create_graph(df):
         
     df['date'] = pd.to_datetime(df['date_time_stamp']).dt.date
