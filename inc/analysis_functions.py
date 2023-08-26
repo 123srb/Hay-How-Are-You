@@ -51,9 +51,10 @@ def get_trending_dictionary():
 def create_graph(df):
     # drop wont be needed I jsut have tset data with dupes
     
-    print(df)
+    #print(df)
     df = df.drop_duplicates()
     print(df)
+    var_names = df.entry.unique()#df.columns.tolist()
     var_names_types = df.groupby(['for_date','entry','value_data_type'])
     df['date'] = pd.to_datetime(df['date_time_stamp']).dt.date
 
@@ -61,13 +62,19 @@ def create_graph(df):
     #df = df.reset_index()
 
     # Get the list of variable names
-    var_names = df.columns.tolist()
     
-    if request.method == 'POST':
+    
+    print('hereeeee')
+
+    if 'variable' in request.form: #request.method == 'POST':
+        
+        print(request.form)
+        
         # Get the selected variable from the form data
         selected_var = request.form['variable']
-        print(var_names_types)
-        if selected_var in var_names_types:
+        #print(var_names_types)
+        print('hereeeee1')
+        if selected_var in var_names:
             if var_names_types[selected_var]['value_data_type'] == 'Integer':
                 df[selected_var] = df[selected_var].fillna(0).astype(int)
             # Create a line plot using seaborn
@@ -85,6 +92,7 @@ def create_graph(df):
         return var_names
     else:
         # Get the selected variable from the form data
+        print('hereeeee2')
         selected_var = 'Day Quality'
         df[selected_var] = df[selected_var].fillna(0).astype(int)
         # Create a line plot using seaborn

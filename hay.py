@@ -178,12 +178,15 @@ def form():
             #csrf token gets automatically passed so we dont want that or our selected date because we use that for the field
             #finally this last if is to check if the field name is one of the columns we deleted for editing a day or has no information as in a new day
             if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and (field.name in columns_to_delete or not columns_to_delete) :
-                c = conn.cursor()
-                row_insert_query = f"INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES ({str(datetime.now())}, {selected_date}.date(), {ef.encrypt_value(field.name)},{ef.encrypt_value(field.data)},{ef.encrypt_value(form_fields[field.name]['value_data_type'])})"
-                print('row insert query: ' + str(row_insert_query))
-                c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),selected_date.date(),ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(form_fields[field.name]['value_data_type'])))
-                conn.commit()
-
+                try:
+                    
+                    c = conn.cursor()
+                    row_insert_query = f"INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES ({str(datetime.now())}, {selected_date.date()}, {ef.encrypt_value(field.name)},{ef.encrypt_value(field.data)},{ef.encrypt_value(form_fields[field.name]['value_data_type'])})"
+                    print('row insert query: ' + str(row_insert_query))
+                    c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),selected_date.date(),ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(form_fields[field.name]['value_data_type'])))
+                    conn.commit()
+                except:
+                    print('issue with: ' + field.name)
 
         conn.close()
         message = 'Data uploaded for: ' + str(selected_date)
@@ -191,7 +194,9 @@ def form():
         pass
     #get the value for how each number valued has be trending up of down
     trend_dict = af.get_trending_dictionary()
+    
     graph_var_names = af.create_graph(af.get_x_days_data(7))
+    print('hereeeeej')
 
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict, selected_date = selected_date, var_names = graph_var_names)
 

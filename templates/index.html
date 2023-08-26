@@ -53,8 +53,11 @@
     </form>
     </table>
     </div>
+    
     <div style="float:left;">
         <div id="chart_form">
+            {{ form.csrf_token }}
+
             <label for="variable">Select a variable:</label>
             <select name="variable" id="variable" onchange="this.form.submit()">
       
@@ -76,10 +79,13 @@
     </div>
     <script>
         $(document).ready(function () {
-            $('#variable').on('change', function () {
+            console.log("JavaScript code executed");
+            $('#chart_form select').on('change', function () {
                 // Serialize the form data
+                var selectedField = $(this).attr("name"); // Get the name of the selected field
                 var formData = $('#chart_form').serialize();
-    
+                console.log("Serialized Form Data:", formData);
+                console.log("Selected Field:", selectedField);
                 // Send a POST request to the server
                 $.ajax({
                     type: 'POST',
