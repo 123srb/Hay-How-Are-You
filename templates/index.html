@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Journal Entry Form</title>
-
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
@@ -22,6 +22,8 @@
 </head>
 <body>
     <h1>Journal Entry</h1>
+
+    <div style="float:left;">
 
     <table>
     <form method="POST" action="/">
@@ -47,12 +49,50 @@
             <td colspan="3">
                 <input type="submit" value="Submit">
             </td>
-        </tr>
-        
+        </tr>  
     </form>
-    
     </table>
-
+    </div>
+    <div style="float:left;">
+        <div id="chart_form">
+            <label for="variable">Select a variable:</label>
+            <select name="variable" id="variable" onchange="this.form.submit()">
+      
+              {% for var_name in var_names %}
+                <option value="{{ var_name }}">{{ var_name }}</option>
+              {% endfor %}
+            </select>
+        </div>
+          
+      
+      
+          {% if request.method == 'POST' %}
+            <img src="{{ url_for('static', filename='plot.png') }}" alt="Line Plot">
+          {% endif %}
+      
+          {% if request.method != 'POST' %}
+          <img src="{{ url_for('static', filename='plot.png') }}" alt="Line Plot">
+        {% endif %}    
+    </div>
+    <script>
+        $(document).ready(function () {
+            $('#variable').on('change', function () {
+                // Serialize the form data
+                var formData = $('#chart_form').serialize();
+    
+                // Send a POST request to the server
+                $.ajax({
+                    type: 'POST',
+                    url: '/',
+                    data: formData,
+                    success: function (data) {
+                        // Update the content of the image container
+                        $('#image-container').html(data);
+                    }
+                });
+            });
+        });
+    </script>
         <p>{{ result_message }}</p>
 
 </body>

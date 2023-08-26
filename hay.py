@@ -54,16 +54,16 @@ def create_form_class(form_fields, date_to_load):
 
         date_to_load_query = f"SELECT * FROM journal WHERE for_date = '{date_to_load.strftime('%Y-%m-%d')}'"
         date_to_load_data = pd.read_sql_query(date_to_load_query, conn)
-
+    
         if not date_to_load_data.empty:
             #load data from the specified day into a df
             date_to_load_data = ef.decrypt_df(date_to_load_data, ['entry','value','value_data_type'])
             date_to_load_columns = date_to_load_data.entry.unique()
-    #   else:
+        else:
         # Get the data from the database using pandas
-    #        latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
-    #        latest_data = pd.read_sql_query(latest_query, conn)
-     #       latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
+            latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
+            latest_data = pd.read_sql_query(latest_query, conn)
+            latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
         
     else:
     # Get the data from the database using pandas
@@ -124,11 +124,9 @@ def create_form_class(form_fields, date_to_load):
     #we'll use the date to load columns values to find what values we should delete
     return DynamicForm, date_to_load_columns
  
-
-
 @app.route('/', methods=['GET', 'POST'])
-
 def form():
+
     #create an empty variable to add a message to submit to user
     message = ''
 
@@ -144,7 +142,7 @@ def form():
         selected_date = datetime.strptime(request.form.get('selected_date'), '%Y-%m-%d') 
   
     else:
-        selected_date = date.today()
+        selected_date = datetime.today()
 
 
     dynamic_form_class, columns_to_delete= create_form_class(form_fields, date_to_load=selected_date)
@@ -165,6 +163,7 @@ def form():
         #decrypt the df and drop the columns that are currently editable in our config file, delete all of that day
         # ', leave the rest alone and ureupload it
         decrypted_df = ef.decrypt_df(df_to_delete_rows, ['entry','value','value_data_type'])
+
         decrypted_df_reupload = decrypted_df.drop(decrypted_df[decrypted_df['entry'].isin(columns_to_delete)].index)
         enrypted_df_reupload = ef.encrypt_df(decrypted_df_reupload, ['entry','value','value_data_type'])
         delete_query = f"DELETE FROM journal WHERE for_date = '{selected_date.date()}'"
@@ -172,7 +171,9 @@ def form():
         enrypted_df_reupload.to_sql('journal', conn, if_exists='append', index=False)
         conn.commit()
 
-        for field in form:
+        for field in form: 
+            print('---------')
+            print(field.name)
             #check if the values name is in the form, and there is data for it.  
             #csrf token gets automatically passed so we dont want that or our selected date because we use that for the field
             #finally this last if is to check if the field name is one of the columns we deleted for editing a day or has no information as in a new day
@@ -190,7 +191,9 @@ def form():
         pass
     #get the value for how each number valued has be trending up of down
     trend_dict = af.get_trending_dictionary()
-    return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict, selected_date = selected_date)
+    graph_var_names = af.create_graph(af.get_x_days_data(7))
+
+    return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict, selected_date = selected_date, var_names = graph_var_names)
 
 if __name__ == '__main__':
     app.run()
