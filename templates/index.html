@@ -55,8 +55,8 @@
     </div>
     
     <div style="float:left;">
-        <div id="chart_form">
-            {{ form.csrf_token }}
+        <form method="POST" action="/" id="chart_form">
+                        {{ form.csrf_token }}
 
             <label for="variable">Select a variable:</label>
             <select name="variable" id="variable" onchange="this.form.submit()">
@@ -65,12 +65,13 @@
                 <option value="{{ var_name }}">{{ var_name }}</option>
               {% endfor %}
             </select>
-        </div>
+        </form>
           
       
       
           {% if request.method == 'POST' %}
-            <img src="{{ url_for('static', filename='plot.png') }}" alt="Line Plot">
+          <img src="{{ url_for('static', filename='plot.png') }}" alt="Line Plot">
+
           {% endif %}
       
           {% if request.method != 'POST' %}
@@ -80,7 +81,7 @@
     <script>
         $(document).ready(function () {
             console.log("JavaScript code executed");
-            $('#chart_form select').on('change', function () {
+            $('#variable').on('change', function () {
                 // Serialize the form data
                 var selectedField = $(this).attr("name"); // Get the name of the selected field
                 var formData = $('#chart_form').serialize();

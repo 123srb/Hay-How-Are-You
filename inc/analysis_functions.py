@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, date
 from sklearn.linear_model import LinearRegression
 import inc.encryption_functions as ef
 from flask import render_template, request
-import matplotlib.pyplot as plt
+
 import seaborn as sns
 
 def get_x_days_data(num_days):
@@ -48,62 +48,4 @@ def get_trending_dictionary():
         result_dict[name] = round(slope,3)
 
     return(result_dict)
-def create_graph(df):
-    # drop wont be needed I jsut have tset data with dupes
-    
-    #print(df)
-    df = df.drop_duplicates()
-    print(df)
-    var_names = df.entry.unique()#df.columns.tolist()
-    var_names_types = df.groupby(['for_date','entry','value_data_type'])
-    df['date'] = pd.to_datetime(df['date_time_stamp']).dt.date
 
-    df = df.pivot(index='for_date', columns='entry', values='value')
-    #df = df.reset_index()
-
-    # Get the list of variable names
-    
-    
-    print('hereeeee')
-
-    if 'variable' in request.form: #request.method == 'POST':
-        
-        print(request.form)
-        
-        # Get the selected variable from the form data
-        selected_var = request.form['variable']
-        #print(var_names_types)
-        print('hereeeee1')
-        if selected_var in var_names:
-            if var_names_types[selected_var]['value_data_type'] == 'Integer':
-                df[selected_var] = df[selected_var].fillna(0).astype(int)
-            # Create a line plot using seaborn
-            fig = plt.figure()
-            sns.lineplot(x='for_date', y=selected_var, data=df)
-            plt.xlabel('Date')
-            plt.ylabel(selected_var)
-            plt.title('Line Plot of {}'.format(selected_var))
-            plt.tight_layout()
-            plt.savefig('static/plot.png')
-        else:
-            print(f"column '{selected_var}' not found in data")
-        
-        # Render the HTML template with the plot image
-        return var_names
-    else:
-        # Get the selected variable from the form data
-        print('hereeeee2')
-        selected_var = 'Day Quality'
-        df[selected_var] = df[selected_var].fillna(0).astype(int)
-        # Create a line plot using seaborn
-        fig = plt.figure()
-        sns.lineplot(x='for_date', y=selected_var, data=df)
-        plt.xlabel('Date')
-        plt.ylabel(selected_var)
-        plt.title('Line Plot of {}'.format(selected_var))
-        plt.tight_layout()
-        plt.savefig('static/plot.png')
-    # If the request method is GET, render the HTML template with the form
-        return var_names
-
-get_trending_dictionary()
