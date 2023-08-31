@@ -2,28 +2,14 @@
 <html>
 <head>
     <title>Journal Entry Form</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const dateInput = document.getElementById("selected_date");
-              
-            dateInput.addEventListener("change", function() {
-                const selectedDate = dateInput.value;
-                const baseUrl = window.location.href.split('?')[0];  // Get the base URL without query parameters
-                const url = `${baseUrl}?selected_date=${selectedDate}`;
-                window.location.href = url;
-            });
-        });
-        </script>
         
-    
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> 
         
 </head>
 <body>
-    <h1>Journal Entry</h1>
 
-    <div style="float:left;">
+    <div style="float:left;width:20%;">
 
     <table>
     <form method="POST" action="/">
@@ -53,53 +39,46 @@
     </form>
     </table>
     </div>
+
     
-    <div style="float:left;">
-        <form method="POST" action="/" id="chart_form">
-                        {{ form.csrf_token }}
-
-            <label for="variable">Select a variable:</label>
-            <select name="variable" id="variable" onchange="this.form.submit()">
-      
-              {% for var_name in var_names %}
-                <option value="{{ var_name }}">{{ var_name }}</option>
-              {% endfor %}
-            </select>
-        </form>
-          
-      
-      
-          {% if request.method == 'POST' %}
-          <img src="{{ url_for('static', filename='plot.png') }}" alt="Line Plot">
-
-          {% endif %}
-      
-          {% if request.method != 'POST' %}
-          <img src="{{ url_for('static', filename='plot.png') }}" alt="Line Plot">
-        {% endif %}    
+    <div style="float:left;width:60%;">
+        
+        <label for="select_column">Select a column:</label>
+        <select id="select_column">
+            {% for column in columns %}
+                <option value="{{ column }}">{{ column }}</option>
+            {% endfor %}
+        </select>
+    
+        <div id="graph", style="float:left;width:100%;"></div>
+    
+        <script>
+            // Function to update the graph based on user selection
+            function updateGraph() {
+                var selectedColumn = document.getElementById('select_column').value;
+                console.log('Selected Column:', selectedColumn); // Add this line for debugging
+                // Send a POST request to the server to get the updated graph data
+                fetch('/update_graph', {
+                    method: 'POST',
+                    body: new URLSearchParams({ 'selected_column': selectedColumn }),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Plot the updated graph using Plotly
+                    Plotly.newPlot('graph', JSON.parse(data));
+                })
+                .catch(error => console.error(error));
+            }
+    
+            // Initial graph rendering
+            updateGraph();
+    
+            // Add an event listener to the select element
+            document.getElementById('select_column').addEventListener('change', updateGraph);
+        </script>
     </div>
-    <script>
-        $(document).ready(function () {
-            console.log("JavaScript code executed");
-            $('#variable').on('change', function () {
-                // Serialize the form data
-                var selectedField = $(this).attr("name"); // Get the name of the selected field
-                var formData = $('#chart_form').serialize();
-                console.log("Serialized Form Data:", formData);
-                console.log("Selected Field:", selectedField);
-                // Send a POST request to the server
-                $.ajax({
-                    type: 'POST',
-                    url: '/',
-                    data: formData,
-                    success: function (data) {
-                        // Update the content of the image container
-                        $('#image-container').html(data);
-                    }
-                });
-            });
-        });
-    </script>
+    
         <p>{{ result_message }}</p>
 
 </body>

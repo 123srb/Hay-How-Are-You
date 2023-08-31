@@ -10,14 +10,20 @@ from flask import render_template, request
 
 import seaborn as sns
 
-def get_x_days_data(num_days):
+def get_x_days_data(num_days, columns_list=['*']):
 # Connect to the SQLite database
     conn = sqlite3.connect('journal.db')
     cursor = conn.cursor()
-    sql_query = f"SELECT * FROM journal WHERE for_date >= '{(date.today()-timedelta(days=num_days)).isoformat()}'"
+  
+    sql_query = f"SELECT {', '.join(columns_list)} FROM journal WHERE for_date >= '{(date.today()-timedelta(days=num_days)).isoformat()}'"
     # Get the data from the database using pandas
+    print(sql_query)
     df = pd.read_sql_query(sql_query, conn)
-    df = ef.decrypt_df(df, ['entry','value','value_data_type'])
+
+    if columns_list == ['*']:
+        df = ef.decrypt_df(df, ['entry','value','value_data_type'])
+    else:
+        df = ef.decrypt_df(df, columns_list)
     conn.close()
     return df
 
@@ -48,4 +54,18 @@ def get_trending_dictionary():
         result_dict[name] = round(slope,3)
 
     return(result_dict)
+
+def pivot_data(df):
+    df['for_date'] = pd.to_datetime(df['for_date']).dt.date
+    df = df.pivot(index='for_date', columns='entry', values='value').reset_index()
+    
+
+    date_range = pd.date_range(start = min(df.for_date), end = max(df.for_date))
+    df.set_index('for_date', inplace=True)
+    df = df.reindex(date_range)
+
+    df.reset_index(drop=False, inplace=True)
+    df.rename(columns={'index': 'for_date'}, inplace=True)
+
+    return df
 

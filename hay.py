@@ -1,6 +1,6 @@
 import sys
 sys.path.append('/inc')
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_wtf import FlaskForm
 from wtforms import DateField, DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField 
 from wtforms.validators import DataRequired, Email, Optional, NumberRange
@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 matplotlib.use('agg')
 import seaborn as sns
 import matplotlib.dates as mdates
+import plotly.express as px
 
 #Check to make sure we have an encryption key, if not, it will make one
 ef.check_key()
@@ -43,6 +44,8 @@ conn.close()
 #Import the json config file that defines the form entries
 with open('config.json') as f:
     form_fields = json.load(f)
+
+
 
 #Dynamically generate a form based on the Json file
 def create_form_class(form_fields, date_to_load):
@@ -136,89 +139,10 @@ def create_form_class(form_fields, date_to_load):
     return DynamicForm, date_to_load_columns
 
 
-def create_graph(df):
-    # drop wont be needed I jsut have tset data with dupes
-    
-    print('----------------------------------------------------------------------------------------------------')
-    df = df.drop_duplicates()
- 
-    var_names = df.entry.unique()#df.columns.tolist()
-    var_names_types = df[['entry','value_data_type']].drop_duplicates()
 
-    df['for_date'] = pd.to_datetime(df['for_date']).dt.date
-
-    df = df.pivot(index='for_date', columns='entry', values='value').reset_index()
-    #df = df.reset_index()
-    date_range = pd.date_range(start = min(df.for_date), end = max(df.for_date))
-    df.set_index('for_date', inplace=True)
-    df = df.reindex(date_range)
-
-    df.reset_index(drop=False, inplace=True)
-    df.rename(columns={'index': 'for_date'}, inplace=True)
-    # Get the list of variable names
-    print('data to graphllloooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo')
-    print(df)
-    print('hereeeee')
-    print(request.form)
-    if 'variable' in request.form: #request.method == 'POST':
-     
-        
-        
-        # Get the selected variable from the form data
-        selected_var = request.form.get('variable')
-
-        print(request.form)
-        #print(var_names_types)
-        print('hereeeee1')
-        print(selected_var)
-        print('Var check: ' + str(var_names_types.loc[var_names_types['entry']== selected_var].value_data_type.values))
-
-        if var_names_types.loc[var_names_types['entry']== selected_var].value_data_type.values.tolist()[0] =='Integer':
-        #if var_names_types[selected_var]['value_data_type'] == 'Integer':
-            df[selected_var] = df[selected_var].fillna(0).astype(int)
-
-        # Create a line plot using seaborn
-        fig = plt.figure()
-        sns.lineplot(x='for_date', y=selected_var, data=df)
-        plt.xlabel('Date')
-        plt.ylabel(selected_var)
-        plt.title('Line Plot of {}'.format(selected_var))
-        plt.tight_layout()
-        ax = plt.gca()  # Get the current axis
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-        plt.xticks(rotation=45)
-        plt.savefig('static/plot.png')
-
-        
-        # Render the HTML template with the plot image
-        return var_names
-    elif 'Day Quality' in df.columns:
-        # Get the selected variable from the form data
-        print('hereeeee2')
-        #print(df)
-        selected_var = 'Day Quality'
-        df[selected_var] = df[selected_var].fillna(0).astype(int)
-        # Create a line plot using seaborn
-        fig = plt.figure()
-        sns.lineplot(x='for_date', y=selected_var, data=df)
-        plt.xlabel('Date')
-        plt.ylabel(selected_var)
-        plt.title('Line Plot of {}'.format(selected_var))
-        plt.tight_layout()
-        ax = plt.gca()  # Get the current axis
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-
-        plt.xticks(rotation=45)
-        plt.savefig('static/plot.png')
-    # If the request method is GET, render the HTML template with the form
-        return var_names
-    else:
-        print('nothing to graph')
-        return []
      
 @app.route('/', methods=['GET', 'POST'])
 def form():
-
     #create an empty variable to add a message to submit to user
     message = ''
 
@@ -287,10 +211,35 @@ def form():
     #get the value for how each number valued has be trending up of down
     trend_dict = af.get_trending_dictionary()
     
-    graph_var_names = create_graph(af.get_x_days_data(7))
+    
     print('hereeeeej')
 
-    return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict, selected_date = selected_date, var_names = graph_var_names)
+    return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict, selected_date = selected_date, columns=af.get_x_days_data(30, ['entry']).entry.unique())
+
+
+
+@app.route('/update_graph', methods=['POST'])
+def update_graph():
+    df = af.pivot_data(af.get_x_days_data(30))
+    print(request.form)
+    selected_column = request.form['selected_column']
+    print(selected_column)
+    print('--------****************--------------')
+    df.sort_values(by='for_date', ascending=True, inplace=True)
+
+    df['for_date'] = df['for_date'].dt.strftime('%Y-%m-%d')
+    print(df)
+    # Create a Plotly figure
+    fig = px.line(df, x='for_date', y=selected_column, title=f'{selected_column} Over Time')
+    fig.update_layout(autotypenumbers='convert types', autosize=True)
+    fig.update_xaxes(
+    tickvals=df['for_date'],  # Use the 'for_date' column as tick values
+    ticktext=df['for_date']   # Use the 'for_date' column as tick labels
+    )
+    # Convert the figure to JSON
+    graph_json = fig.to_json()
+    
+    return jsonify(graph_json)
 
 if __name__ == '__main__':
     app.run()
