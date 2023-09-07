@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Entry</title>
+</head>
+<body>
+    <h1>Add Entry</h1>
+    <form method="POST" id="add-form">
+        {{ form.csrf_token }}
+        <label for="entry">Entry:</label>
+        {{ form.entry.label }}
+        {{ form.entry }}
+        <br>
+        <label for="type">Type:</label>
+        {{ form.type.label }}
+        {{ form.type }}
+        <br>
+        <label for="default_type">Default:</label>
+        {{ form.default_type.label }}
+        {{ form.default_type }}
+        <br>
+        <div class="form-group" id="choices-container" style="display: none;">
+            <label for="choices">Choices:</label>
+            {{ form.choices.label }}
+            {{ form.choices }}
+        </div>
+        <br>
+        <input type="submit" value="Add">
+    </form>
+
+    <script>
+        // Handle showing/hiding the "Choices" field based on the selected "Type" value
+        const typeInputAdd = document.getElementById('type');
+        const choicesInputAdd = document.getElementById('choices');
+        const choicesContainerAdd = document.getElementById('choices-container');
+
+        typeInputAdd.addEventListener('change', () => {
+            if (typeInputAdd.value === 'SelectField') {
+                choicesContainerAdd.style.display = 'block';
+            } else {
+                // When "Type" is not "SelectField," hide the "Choices" container and clear the input value
+                choicesContainerAdd.style.display = 'none';
+                choicesInputAdd.value = ''; // Set its value to empty
+            }
+        });
+    </script>
+</body>
+</html>

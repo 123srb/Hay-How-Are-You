@@ -1,6 +1,6 @@
 import sys
 sys.path.append('/inc')
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file
 from flask_wtf import FlaskForm
 from wtforms import DateField, DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField 
 from wtforms.validators import DataRequired, Email, Optional, NumberRange
@@ -18,6 +18,7 @@ matplotlib.use('agg')
 import seaborn as sns
 import matplotlib.dates as mdates
 import plotly.express as px
+import io
 
 #Check to make sure we have an encryption key, if not, it will make one
 ef.check_key()
@@ -240,6 +241,24 @@ def update_graph():
     graph_json = fig.to_json()
     
     return jsonify(graph_json)
+
+@app.route('/download_file')
+def download_file():
+    # Create a file-like buffer to receive the output
+    df= af.get_entire_db()
+    csv_data = df.to_csv(index=False).encode('utf-8')
+
+    # Create a file-like buffer to hold the CSV data in memory
+    output = io.BytesIO()
+    output.write(csv_data)
+    output.seek(0)
+    #filename = f"datebase_{str(df.for_date.min())}_{str(df.for_date.max())}.txt"
+    filename = 'journal_database.csv'
+    print('---sssssssssssssssssssssssssssssssssssssssssssssssssssssss-----------')
+
+    # Send the file as an attachment with the provided filename
+    return send_file(output, as_attachment=True, download_name=filename)
+
 
 if __name__ == '__main__':
     app.run()

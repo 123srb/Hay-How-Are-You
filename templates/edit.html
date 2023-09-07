@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Entry</title>
+</head>
+<body>
+    <h1>Edit Entry</h1>
+    <form method="POST">
+        {{ form.csrf_token }}
+        <label for="entry">Entry:</label>
+        {{ form.entry.label }}
+        {{ form.entry }}
+        <br>
+        <label for="type">Type:</label>
+        {{ form.type.label }}
+        {{ form.type }}
+        <br>
+        <label for="default_type">Default Type:</label>
+        {{ form.default_type.label }}
+        {{ form.default_type }}
+        <br>
+        <div id="choices-container" style="display: none;">
+            <label for="choices">Choices:</label>
+            {{ form.choices.label }}
+            {{ form.choices }}
+        </div>
+        <br>
+        <input type="submit" value="Save">
+    </form>
+    
+    <script>
+        // Show or hide the "Choices" field based on the selected type
+        const typeInput = document.getElementById('{{ form.type.id }}');
+        const choicesContainer = document.getElementById('choices-container');
+
+        typeInput.addEventListener('change', () => {
+            if (typeInput.value === 'SelectField' || typeInput.value=== 'RadioField') {
+                choicesContainer.style.display = 'block';
+            } else {
+                choicesContainer.style.display = 'none';
+            }
+        });
+
+        // Initialize the field visibility based on the initial value
+        if (typeInput.value === 'SelectField') {
+            choicesContainer.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -27,6 +27,20 @@ def get_x_days_data(num_days, columns_list=['*']):
     conn.close()
     return df
 
+def get_entire_db():
+   # Connect to the SQLite database
+    conn = sqlite3.connect('journal.db')
+    cursor = conn.cursor()
+    sql_query = "SELECT * FROM journal"
+    # Get the data from the database using pandas
+    df = pd.read_sql_query(sql_query, conn)
+    df = ef.decrypt_df(df, ['entry','value','value_data_type'])
+    print('---sssssssssssssssssssssssssssssssssssssssssssssssssssssss-----------')
+
+    conn.close()
+
+    return df
+
 def get_trending_dictionary():
     #dict to store our results
     result_dict = {}   
