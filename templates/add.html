@@ -6,30 +6,63 @@
 <body>
     {{ result_message }}
     <h1>Add Entry</h1>
-    <form method="POST" id="add-form">
+    <form method="POST" id="add-form" action="http://127.0.0.1:5000/add">
         {{ form.csrf_token }}
         <label for="entry">Entry:</label>
         {{ form.entry.label }}
         {{ form.entry }}
+                {% if form.entry.errors %}
+                <ul class="errors">
+                    {% for error in form.entry.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
         <br>
         <label for="type">Type:</label>
         {{ form.type.label }}
         {{ form.type }}
         <br>
         <label for="variable_type">Variable Type:</label>
+               
         {{ form.variable_type.label }}
-        {{ form.variable_type }}
+        {{ form.variable_type }} 
+
         <br>
-        <label for="default_type">Default:</label>
+        <label for="default_type">Default Type:</label>
         {{ form.default_type.label }}
         {{ form.default_type }}
+        {% if form.default_type.errors %}
+        <ul class="errors">
+            {% for error in form.default_type.errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
         <br>
+        
+        <div class="form-group" id="default_value-container" style="display: none;">
+            <label for="default_value">Default Value:</label>
+            {{ form.default_value.label }}
+            {{ form.default_value }}
+
+            {% if form.default_value.errors %}
+            <ul class="errors">
+                {% for error in form.default_value.errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+
+        <br>
+
         <div class="form-group" id="choices-container" style="display: none;">
             <label for="choices">Choices:</label>
             {{ form.choices.label }}
             {{ form.choices }}
             <p> Format your choices like this or just copy paste:</p>
-            <p> Binary:  ('0', 'No'), ('1', 'Yes')</p>
+            <p> Yes or No:  ('0', 'No'), ('1', 'Yes')</p>
             <p> Numeric: ('1', '1'), ('2', '2'), ('3', '3'), ('4', '4'), ('5', '5')</p>
             <p> Numeric option 2: ('0', 'Terrible'), ('1', 'Not Good'), ('2','Ok'), ('3','Good'),('4','Great')</p>
             <p> String: ('Ill', 'Ill'),('Injured', 'Injured'), ('Not Feeling well', 'Not feeling well'), ('A-ok', 'A-ok')</p>
@@ -44,7 +77,13 @@
         const typeInput = document.getElementById('{{ form.type.id }}');
         const choicesInput = document.getElementById('{{ form.choices.id }}'); // Assuming the ID of the Choices input field is form.choices.id
         const choicesContainer = document.getElementById('choices-container');
-    
+            
+        const defaultInput = document.getElementById('{{ form.default_type.id }}');
+        const defaultValueInput = document.getElementById('{{ form.default_value.id }}');
+        const defaultValueContainer = document.getElementById('default_value-container');
+
+        const variableTypeInput = document.getElementById('{{ form.variable_type.id }}'); // Add this line
+
         typeInput.addEventListener('change', () => {
             if (typeInput.value === 'SelectField' || typeInput.value === 'RadioField') {
                 choicesContainer.style.display = 'block';
@@ -52,14 +91,37 @@
                 choicesContainer.style.display = 'none';
                 choicesInput.value = ''; // Set the value to empty when hidden
             }
+            if (typeInput.value === 'BooleanField') {
+                variableTypeInput.value = 'Binary';
+                variableTypeInput.style.display = 'none';
+            } else {
+                variableTypeInput.style.display = 'block';
+            }
         });
-    
+
+
+        defaultInput.addEventListener('change', () => {
+            if (defaultInput.value === 'Default Value') {
+                defaultValueContainer.style.display = 'block';
+            } else {
+                defaultValueContainer.style.display = 'none';
+                defaultValueInput.value = ''; // Set the value to empty when hidden
+            }
+        });
+
         // Initialize the field visibility based on the initial value
         if (typeInput.value === 'SelectField' || typeInput.value === 'RadioField') {
             choicesContainer.style.display = 'block';
+        }
+
+        if (defaultInput.value === 'Default Value'){
+            defaultValueContainer.style.display = 'block';
+        }
+        if (typeInput.value === 'BooleanField') {
+            variableTypeInput.value = 'Binary'; // Lock to "Binary"
+            variableTypeInput.style.display = 'none';
         }
     </script>
     
 </body>
 </html>
-
