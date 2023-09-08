@@ -1,0 +1,16 @@
+
+
+@app.route('/update_active/<int:id>', methods=['POST'])
+def update_active(id):
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    # Get the new "active" status from the form
+    active = 1 if request.form.get('active') else 0
+
+    # Update the "active" status in the database
+    cursor.execute("UPDATE entries SET active=? WHERE id=?", (active, id))
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('index'))

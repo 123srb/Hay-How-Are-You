@@ -5,6 +5,7 @@ from wtforms import StringField, SelectField
 from wtforms.validators import DataRequired
 import ast
 
+
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 DATABASE = 'database.db'
@@ -19,7 +20,9 @@ cursor.execute( """CREATE TABLE IF NOT EXISTS entries (
     variable_type TEXT NOT NULL,
     default_type TEXT,
     default_value TEXT,
-    choices TEXT
+    choices TEXT,
+    active INTEGER DEFAULT 1
+    
 );"""
 )
 conn.close()
@@ -32,6 +35,7 @@ class EntryForm(FlaskForm):
     default_type = SelectField('Default Type',  choices=[('Empty', 'Empty'), ('Default Value', 'Default Value'), ('Load Previous Value', 'Load Previous Value')] )
     default_value = StringField('Default Value')
     choices = StringField('Choices')
+    
 
 # Helper function to fetch data from the database
 def get_entries():
@@ -46,6 +50,8 @@ def get_entries():
 @app.route('/')
 def index():
     entries = get_entries()
+    print(entries)
+
     return render_template('index.html', entries=entries)
 
 # Route for editing an entry
@@ -82,10 +88,9 @@ def add():
 
     if form.validate_on_submit():
         data = form.data
-        print(f"data['type']: {data['type']}")
-        print(f"data['default_type']: {data['default_type']}")
-        print(f"data['default_value']: {data['default_value']}")
-        # Perform additional checks and set the message variable if needed.
+
+#Add some error checking
+#Check to make sure Select and Radio Fields have a correct number items in their choices
         if data['type'] in ['SelectField', 'RadioField']:
             choices_list_tuple_list = ast.literal_eval(data['choices'])
 
@@ -101,21 +106,21 @@ def add():
                     strings += 1
             if numbers > 0 and strings > 0:
                 message = 'It looks like you are combining strings and numbers in your choices, please check the first entry of each option ("first","second")'
-        
-        print('kkkkkkkkkkkkk')
+#'Boolean fields Need to be Boolean        
         if data['type'] == 'BooleanField':
             if  (data['default_type']=='Default Value'):
                 print(data['default_value'])
                 if (data['default_value'] not in ['True', 'False']):
                     message = 'Your default value for a Boolean can only be True or False'
   
-
+#string can't be numbers, but really it would probably still work because strings are numbers by default
         elif data['variable_type'] == 'String':
             if not isinstance(data['default_value'], str):
                 message = 'You chose String as your variable type, but your default value is not a variable'
 
+#check if an integer value isn't a number, then check if you can float it, if you can check if it is whole to make an int
         elif data['variable_type'] == 'Integer':
-            if not isinstance(data['default_value'], (int, float)):
+            if (not isinstance(data['default_value'], (int, float))) and  (data['default_type']=='Default Value'):
                 try:
                     data['default_value'] = float(data['default_value'])
                     if data['default_value'].is_integer():
@@ -135,6 +140,27 @@ def add():
         return redirect(url_for('index'))
 
     return render_template('add.html', form=form, result_message=message)
+
+
+@app.route('/update_active', methods=['POST'])
+def update_active():
+    if request.method == 'POST':
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        # Get the list of entry IDs and their new "active" status from the form
+        entry_ids = request.form.getlist('entry_update')
+
+        cursor.execute("UPDATE entries SET active=0")
+        for entry_id in entry_ids:
+            print(entry_id)
+            cursor.execute("UPDATE entries SET active=1 WHERE id=?", (entry_id,))  
+
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('index'))
+    
 
 if __name__ == '__main__':
     app.run(debug=True)
