@@ -4,6 +4,7 @@
     <title>Add Entry</title>
 </head>
 <body>
+    {{ result_message }}
     <h1>Add Entry</h1>
     <form method="POST" id="add-form">
         {{ form.csrf_token }}
@@ -15,6 +16,10 @@
         {{ form.type.label }}
         {{ form.type }}
         <br>
+        <label for="variable_type">Variable Type:</label>
+        {{ form.variable_type.label }}
+        {{ form.variable_type }}
+        <br>
         <label for="default_type">Default:</label>
         {{ form.default_type.label }}
         {{ form.default_type }}
@@ -23,26 +28,38 @@
             <label for="choices">Choices:</label>
             {{ form.choices.label }}
             {{ form.choices }}
+            <p> Format your choices like this or just copy paste:</p>
+            <p> Binary:  ('0', 'No'), ('1', 'Yes')</p>
+            <p> Numeric: ('1', '1'), ('2', '2'), ('3', '3'), ('4', '4'), ('5', '5')</p>
+            <p> Numeric option 2: ('0', 'Terrible'), ('1', 'Not Good'), ('2','Ok'), ('3','Good'),('4','Great')</p>
+            <p> String: ('Ill', 'Ill'),('Injured', 'Injured'), ('Not Feeling well', 'Not feeling well'), ('A-ok', 'A-ok')</p>
+            <p> The first value is what will be saved in the database, the second is what will show on the form.</p>
         </div>
         <br>
         <input type="submit" value="Add">
     </form>
 
     <script>
-        // Handle showing/hiding the "Choices" field based on the selected "Type" value
-        const typeInputAdd = document.getElementById('type');
-        const choicesInputAdd = document.getElementById('choices');
-        const choicesContainerAdd = document.getElementById('choices-container');
-
-        typeInputAdd.addEventListener('change', () => {
-            if (typeInputAdd.value === 'SelectField') {
-                choicesContainerAdd.style.display = 'block';
+        // Show or hide the "Choices" field based on the selected type
+        const typeInput = document.getElementById('{{ form.type.id }}');
+        const choicesInput = document.getElementById('{{ form.choices.id }}'); // Assuming the ID of the Choices input field is form.choices.id
+        const choicesContainer = document.getElementById('choices-container');
+    
+        typeInput.addEventListener('change', () => {
+            if (typeInput.value === 'SelectField' || typeInput.value === 'RadioField') {
+                choicesContainer.style.display = 'block';
             } else {
-                // When "Type" is not "SelectField," hide the "Choices" container and clear the input value
-                choicesContainerAdd.style.display = 'none';
-                choicesInputAdd.value = ''; // Set its value to empty
+                choicesContainer.style.display = 'none';
+                choicesInput.value = ''; // Set the value to empty when hidden
             }
         });
+    
+        // Initialize the field visibility based on the initial value
+        if (typeInput.value === 'SelectField' || typeInput.value === 'RadioField') {
+            choicesContainer.style.display = 'block';
+        }
     </script>
+    
 </body>
 </html>
+

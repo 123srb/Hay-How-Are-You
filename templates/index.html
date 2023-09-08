@@ -9,6 +9,7 @@
         <tr>
             <th>Entry</th>
             <th>Type</th>
+            <th>variable_type</th>
             <th>Default Type</th>
             <th>Choices</th>
             <th>Actions</th>
@@ -19,10 +20,12 @@
             <td>{{ entry[2] }}</td>
             <td>{{ entry[3] }}</td>
             <td>{{ entry[4] }}</td>
+            <td>{{ entry[5] }}</td>
             <td><a href="{{ url_for('edit', id=entry[0]) }}">Edit</a></td>
         </tr>
         {% endfor %}
     </table>
     <a href="{{ url_for('add') }}">Add Entry</a>
+    <p>{{ result_message }}</p>
 </body>
 </html>
