@@ -19,6 +19,8 @@ import seaborn as sns
 import matplotlib.dates as mdates
 import plotly.express as px
 import io
+import ast
+
 
 #Check to make sure we have an encryption key, if not, it will make one
 ef.check_key()
@@ -41,12 +43,110 @@ c.execute('''CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY, date_ti
 
 conn.close()
 
+DATABASE = 'journal.db'
 
+
+conn = sqlite3.connect(DATABASE)
+cursor = conn.cursor()
+cursor.execute( """CREATE TABLE IF NOT EXISTS entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry TEXT NOT NULL,
+    type TEXT NOT NULL,
+    variable_type TEXT NOT NULL,
+    default_type TEXT,
+    default_value TEXT,
+    choices TEXT,
+    active INTEGER DEFAULT 1
+    
+);"""
+)
+conn.close()
+
+# Define a form for editing and adding rows
+class EntryForm(FlaskForm):
+    entry = StringField('Entry', validators=[DataRequired()])
+    type = SelectField('Type', choices=[('StringField', 'StringField'), ('TextAreaField', 'TextAreaField'), ('BooleanField', 'BooleanField'), ('SelectField', 'SelectField'), ('RadioField', 'RadioField')])
+    variable_type = SelectField('Variable Type', choices=[('String', 'Text'), ('Binary', 'Yes or No'), ('Integer', 'Numeric')] ) 
+    default_type = SelectField('Default Type',  choices=[('Empty', 'Empty'), ('Default Value', 'Default Value'), ('Load Previous Value', 'Load Previous Value')] )
+    default_value = StringField('Default Value')
+    choices = StringField('Choices')
+# Helper function to fetch data from the database
+def get_entries():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM entries")
+    entries = cursor.fetchall()
+    conn.close()
+    return entries
+
+     
 #Import the json config file that defines the form entries
 with open('config.json') as f:
     form_fields = json.load(f)
 
+def check_entry_data(data, current_var_names):
+#Add some error checking
+#Check to make sure Select and Radio Fields have a correct number items in their choices
+    message = ''
+    if data['entry'] in current_var_names:
+        message = 'Sorry, it looks like you already have another variable with this name!'
 
+    if data['type'] in ['SelectField', 'RadioField']:
+
+        try: 
+            choices_list_tuple_list = ast.literal_eval(data['choices'])
+        except:
+            message = 'Sorry, but this does not to be in the right format, please look over the options below and try again'
+            return message
+
+        if len(choices_list_tuple_list) <= 1:
+            message = 'It looks like you do not have multiple values in your choices, please separate each value with a comma'
+            return message
+
+        strings = 0
+        numbers = 0
+        for tup in choices_list_tuple_list:
+            if tup[0].isdigit():
+                numbers += 1
+            else:
+                strings += 1
+        if numbers > 0 and strings > 0:
+            message = 'It looks like you are combining strings and numbers in your choices, please check the first entry of each option ("first","second")'
+        if data['variable_type'] == 'Integer' and strings > 0:
+            message = 'It appears that there are string values in your choices, they must match your variable type'
+
+        if data['variable_type'] == 'Binary':
+                if len(choices_list_tuple_list) != 2:
+                    message = 'You can only have 2 valeus in a binary variable type'
+                binary_list = [choices_list_tuple_list[0][0], choices_list_tuple_list[1][0]]
+                if binary_list.count(0) != 1 and binary_list.count(1) != 1:
+                    message = 'A binary variable has to have a 1 and a 0 in it'
+
+
+
+
+#'Boolean fields Need to be Boolean        
+    if data['type'] == 'BooleanField':
+        if  (data['default_type']=='Default Value'):
+            print(data['default_value'])
+            if (data['default_value'] not in ['True', 'False']):
+                message = 'Your default value for a Boolean can only be True or False'
+
+#string can't be numbers, but really it would probably still work because strings are numbers by default
+    elif data['variable_type'] == 'String':
+        if not isinstance(data['default_value'], str):
+            message = 'You chose String as your variable type, but your default value is not a variable'
+
+#check if an integer value isn't a number, then check if you can float it, if you can check if it is whole to make an int
+    elif data['variable_type'] == 'Integer':
+        if (not isinstance(data['default_value'], (int, float))) and  (data['default_type']=='Default Value'):
+            try:
+                data['default_value'] = float(data['default_value'])
+                if data['default_value'].is_integer():
+                    data['default_value'] = int(data['default_value'])
+            except ValueError:
+                message = 'You chose Number as your default value, but this value is a string'
+    return message
 
 #Dynamically generate a form based on the Json file
 def create_form_class(form_fields, date_to_load):
@@ -127,8 +227,6 @@ def create_form_class(form_fields, date_to_load):
     else: 
         default_date=date.today
 
-    print('date to load is: ' + str(date_to_load))
-    print('default date is: ' + str(default_date))
 
     date_field_args = {
         'default': default_date,
@@ -150,14 +248,10 @@ def form():
     #check get, and then the form for the selected date, if neither are set default to todays date
 
     if request.args.get('selected_date'):
-        
         raw_date = request.args.get('selected_date')
         selected_date = datetime.strptime(raw_date, '%Y-%m-%d')  # Convert string to datetime  
-
     elif request.form.get('selected_date'):
-
         selected_date = datetime.strptime(request.form.get('selected_date'), '%Y-%m-%d') 
-  
     else:
         selected_date = date.today()
 
@@ -176,21 +270,20 @@ def form():
         df_to_delete_rows_query = f"SELECT * FROM journal WHERE for_date = '{selected_date.strftime('%Y-%m-%d')}'"
         df_to_delete_rows = pd.read_sql_query(df_to_delete_rows_query, conn)
 
-        #decrypt the df and drop the columns that are currently editable in our config file, delete all of that day
+        #decrypt the df and drop the columns that are currently editable in our config file because we are uploading values for them
+        # delete all of that day in the table since we have all the values that aren't editable in our dataframe 
         # ', leave the rest alone and ureupload it
         decrypted_df = ef.decrypt_df(df_to_delete_rows, ['entry','value','value_data_type'])
 
         decrypted_df_reupload = decrypted_df.drop(decrypted_df[decrypted_df['entry'].isin(columns_to_delete)].index)
         enrypted_df_reupload = ef.encrypt_df(decrypted_df_reupload, ['entry','value','value_data_type'])
         delete_query = f"DELETE FROM journal WHERE for_date = '{selected_date.strftime('%Y-%m-%d')}'"
-        #print("delete query run: " + str(delete_query))
         c.execute(delete_query)   
         enrypted_df_reupload.to_sql('journal', conn, if_exists='append', index=False)
         conn.commit()
 
         for field in form: 
-            #print('---------')
-            #print(field.name)
+
             #check if the values name is in the form, and there is data for it.  
             #csrf token gets automatically passed so we dont want that or our selected date because we use that for the field
             #finally this last if is to check if the field name is one of the columns we deleted for editing a day or has no information as in a new day
@@ -212,8 +305,6 @@ def form():
     #get the value for how each number valued has be trending up of down
     trend_dict = af.get_trending_dictionary()
     
-    
-    print('hereeeeej')
 
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict, selected_date = selected_date, columns=af.get_x_days_data(30, ['entry']).entry.unique())
 
@@ -221,18 +312,16 @@ def form():
 
 @app.route('/update_graph', methods=['POST'])
 def update_graph():
-    df = af.pivot_data(af.get_x_days_data(30))
-    print(request.form)
-    selected_column = request.form['selected_column']
-    print(selected_column)
-    print('--------****************--------------')
-    df.sort_values(by='for_date', ascending=True, inplace=True)
 
+    df = af.pivot_data(af.get_x_days_data(30))
+    selected_column = request.form['selected_column']
+    df.sort_values(by='for_date', ascending=True, inplace=True)
     df['for_date'] = df['for_date'].dt.strftime('%Y-%m-%d')
-    print(df)
     # Create a Plotly figure
     fig = px.line(df, x='for_date', y=selected_column, title=f'{selected_column} Over Time')
+    #have the chart interpret/order the x axis correctly
     fig.update_layout(autotypenumbers='convert types', autosize=True)
+    #format x axis
     fig.update_xaxes(
     tickvals=df['for_date'],  # Use the 'for_date' column as tick values
     ticktext=df['for_date']   # Use the 'for_date' column as tick labels
@@ -244,7 +333,7 @@ def update_graph():
 
 @app.route('/download_file')
 def download_file():
-    # Create a file-like buffer to receive the output
+    # Create a file-like buffer to receive the output only store in ram
     df= af.get_entire_db()
     csv_data = df.to_csv(index=False).encode('utf-8')
 
@@ -252,13 +341,119 @@ def download_file():
     output = io.BytesIO()
     output.write(csv_data)
     output.seek(0)
-    #filename = f"datebase_{str(df.for_date.min())}_{str(df.for_date.max())}.txt"
     filename = 'journal_database.csv'
-    print('---sssssssssssssssssssssssssssssssssssssssssssssssssssssss-----------')
 
     # Send the file as an attachment with the provided filename
     return send_file(output, as_attachment=True, download_name=filename)
 
+@app.route('/journal_fields')
+def index():
+    entries = get_entries()
+    print(entries)
+
+    return render_template('journal_fields.html', entries=entries)
+
+@app.route('/update_active', methods=['POST'])
+def update_active():
+    if request.method == 'POST':
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        # Get the list of entry IDs and their new "active" status from the form
+        entry_ids = request.form.getlist('entry_update')
+
+        cursor.execute("UPDATE entries SET active=0")
+        for entry_id in entry_ids:
+            print(entry_id)
+            cursor.execute("UPDATE entries SET active=1 WHERE id=?", (entry_id,))  
+
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('index'))
+@app.route('/add', methods=['GET', 'POST'])
+def add():
+    form = EntryForm()
+    message = ''
+
+    conn = sqlite3.connect('journal.db')
+    cursor = conn.cursor()
+    sql_query = "SELECT * FROM entries"
+    # Get the data from the database using pandas
+    current_entries = pd.read_sql_query(sql_query, conn)
+ 
+
+    conn.close()
+
+    print(current_entries)
+    print('-----------------------------------------------')
+    current_var_names = current_entries.entry.unique()
+
+    if form.validate_on_submit():
+        data = form.data
+
+        message = check_entry_data(data, current_var_names)
+
+        if message != '':
+            return render_template('add.html', form=form, result_message=message)
+
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices) VALUES (?, ?, ?, ?, ?, ?)",
+                       (data['entry'], data['type'],data['variable_type'], data['default_type'], data['default_value'], data['choices']))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('index'))
+
+    return render_template('add.html', form=form, result_message=message)
+
+# Route for editing an entry
+@app.route('/edit/<int:id>', methods=['GET', 'POST'])
+def edit(id):
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    # Fetch the entry to be edited
+    cursor.execute("SELECT * FROM entries WHERE id=?", (id,))
+    entry = cursor.fetchone()
+
+    if entry is None:
+        # Handle the case where the entry with the given ID does not exist
+        return redirect(url_for('index')) 
+
+    # Populate the form with existing data
+    form = EntryForm(data={'entry': entry[1], 'type': entry[2], 'variable_type': entry[3], 'default_type': entry[4], 'default_value': entry[5],'choices': entry[6]})
+
+    if form.validate_on_submit():
+        # Update the entry in the database
+        data = form.data
+        cursor.execute("UPDATE entries SET entry=?, type=?, variable_type=?, default_type=?, default_value=?, choices=? WHERE id=?", (
+            data['entry'], data['type'], data['variable_type'], data['default_type'], data['default_value'], data['choices'], id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('index'))
+
+    conn.close()
+    return render_template('edit.html', form=form, entry=entry, entry_id=id)
+
+@app.route('/delete/<int:id>', methods=['POST'])
+def delete_entry(id):
+    print('delee')
+    if request.method == 'POST':
+        print('delete post')
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM entries WHERE id=?", (id,))
+        conn.commit()
+        conn.close()
+
+        # Return a JSON response to indicate successful deletion
+        print('madeittodelete')
+        return redirect(url_for('index'))
+        #return render_template('index.html')
+
+        #return jsonify({'message': 'Entry deleted successfully'})
 
 if __name__ == '__main__':
     app.run()

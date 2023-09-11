@@ -75,15 +75,15 @@
     <script>
         // Show or hide the "Choices" field based on the selected type
         const typeInput = document.getElementById('{{ form.type.id }}');
-        const choicesInput = document.getElementById('{{ form.choices.id }}'); // Assuming the ID of the Choices input field is form.choices.id
+        const choicesInput = document.getElementById('{{ form.choices.id }}');
         const choicesContainer = document.getElementById('choices-container');
-            
+        
         const defaultInput = document.getElementById('{{ form.default_type.id }}');
         const defaultValueInput = document.getElementById('{{ form.default_value.id }}');
         const defaultValueContainer = document.getElementById('default_value-container');
-
-        const variableTypeInput = document.getElementById('{{ form.variable_type.id }}'); // Add this line
-
+    
+        const variableTypeSelect = document.getElementById('{{ form.variable_type.id }}');
+    
         typeInput.addEventListener('change', () => {
             if (typeInput.value === 'SelectField' || typeInput.value === 'RadioField') {
                 choicesContainer.style.display = 'block';
@@ -92,14 +92,27 @@
                 choicesInput.value = ''; // Set the value to empty when hidden
             }
             if (typeInput.value === 'BooleanField') {
-                variableTypeInput.value = 'Binary';
-                variableTypeInput.style.display = 'none';
+                variableTypeSelect.value = 'Binary';
+                variableTypeSelect.style.display = 'none';
             } else {
-                variableTypeInput.style.display = 'block';
+                variableTypeSelect.style.display = 'block';
+                // Enable or disable the "Yes and No" option based on the selected type
+                if (typeInput.value === 'StringField') {
+                    for (const option of variableTypeSelect.options) {
+                        if (option.value === 'Binary') {
+                            option.disabled = true;
+                        } else {
+                            option.disabled = false;
+                        }
+                    }
+                } else {
+                    for (const option of variableTypeSelect.options) {
+                        option.disabled = false;
+                    }
+                }
             }
         });
-
-
+    
         defaultInput.addEventListener('change', () => {
             if (defaultInput.value === 'Default Value') {
                 defaultValueContainer.style.display = 'block';
@@ -108,20 +121,33 @@
                 defaultValueInput.value = ''; // Set the value to empty when hidden
             }
         });
-
+    
         // Initialize the field visibility based on the initial value
         if (typeInput.value === 'SelectField' || typeInput.value === 'RadioField') {
             choicesContainer.style.display = 'block';
         }
-
+    
         if (defaultInput.value === 'Default Value'){
             defaultValueContainer.style.display = 'block';
         }
         if (typeInput.value === 'BooleanField') {
-            variableTypeInput.value = 'Binary'; // Lock to "Binary"
-            variableTypeInput.style.display = 'none';
+            variableTypeSelect.value = 'Binary'; // Lock to "Binary"
+            variableTypeSelect.style.display = 'none';
+        } else {
+            variableTypeSelect.style.display = 'block';
+            // Enable or disable the "Yes and No" option based on the selected type
+            if (typeInput.value === 'StringField' || typeInput.value === 'TextAreaField') {
+                for (const option of variableTypeSelect.options) {
+                    if (option.value === 'Binary') {
+                        option.disabled = true;
+                    } else {
+                        option.disabled = false;
+                    }
+                }
+            }
         }
     </script>
+    
     
 </body>
 </html>

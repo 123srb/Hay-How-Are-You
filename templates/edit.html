@@ -4,6 +4,7 @@
     <title>Edit Entry</title>
 </head>
 <body>
+    {{ result_message }}
     <h1>Edit Entry</h1>
     <form method="POST">
         {{ form.csrf_token }}
@@ -23,31 +24,120 @@
         {{ form.default_type.label }}
         {{ form.default_type }}
         <br>
-        <div id="choices-container" style="display: none;">
+        <div class="form-group" id="choices-container" style="display: none;">
             <label for="choices">Choices:</label>
             {{ form.choices.label }}
             {{ form.choices }}
+            <p> Format your choices like this or just copy paste:</p>
+            <p> Yes or No:  ('0', 'No'), ('1', 'Yes')</p>
+            <p> Numeric: ('1', '1'), ('2', '2'), ('3', '3'), ('4', '4'), ('5', '5')</p>
+            <p> Numeric option 2: ('0', 'Terrible'), ('1', 'Not Good'), ('2','Ok'), ('3','Good'),('4','Great')</p>
+            <p> String: ('Ill', 'Ill'),('Injured', 'Injured'), ('Not Feeling well', 'Not feeling well'), ('A-ok', 'A-ok')</p>
+            <p> The first value is what will be saved in the database, the second is what will show on the form.</p>
         </div>
         <br>
         <input type="submit" value="Save">
-    </form>
+        <br>
+        <br>
+        <button type="button" onclick="confirmDelete({{ entry_id }})">Delete</button>
+
+   </form>
     
     <script>
         // Show or hide the "Choices" field based on the selected type
         const typeInput = document.getElementById('{{ form.type.id }}');
+        const choicesInput = document.getElementById('{{ form.choices.id }}'); // Assuming the ID of the Choices input field is form.choices.id
         const choicesContainer = document.getElementById('choices-container');
+            
+        const defaultInput = document.getElementById('{{ form.default_type.id }}');
+        const defaultValueInput = document.getElementById('{{ form.default_value.id }}');
+        const defaultValueContainer = document.getElementById('default_value-container');
+
+        // Add ID to the select field of "Variable Type"
+        const variableTypeSelect = document.getElementById('{{ form.variable_type.id }}'); // Add this line
 
         typeInput.addEventListener('change', () => {
-            if (typeInput.value === 'SelectField' || typeInput.value=== 'RadioField') {
+            if (typeInput.value === 'SelectField' || typeInput.value === 'RadioField') {
                 choicesContainer.style.display = 'block';
             } else {
                 choicesContainer.style.display = 'none';
+                choicesInput.value = ''; // Set the value to empty when hidden
+            }
+            if (typeInput.value === 'BooleanField') {
+                variableTypeSelect.value = 'Binary';
+                variableTypeSelect.style.display = 'none';
+            } else {
+                variableTypeSelect.style.display = 'block';
+                // Enable or disable the "Yes and No" option based on the selected type
+                if (typeInput.value === 'StringField' || typeInput.value === 'TextAreaField') {
+                    for (const option of variableTypeSelect.options) {
+                        if (option.value === 'Binary') {
+                            option.disabled = true;
+                        } else {
+                            option.disabled = false;
+                        }
+                    }
+                } else {
+                    for (const option of variableTypeSelect.options) {
+                        option.disabled = false;
+                    }
+                }
+            }
+        });
+
+        defaultInput.addEventListener('change', () => {
+            if (defaultInput.value === 'Default Value') {
+                defaultValueContainer.style.display = 'block';
+            } else {
+                defaultValueContainer.style.display = 'none';
+                defaultValueInput.value = ''; // Set the value to empty when hidden
             }
         });
 
         // Initialize the field visibility based on the initial value
-        if (typeInput.value === 'SelectField') {
+        if (typeInput.value === 'SelectField' || typeInput.value === 'RadioField') {
             choicesContainer.style.display = 'block';
+        }
+    
+        if (defaultInput.value === 'Default Value'){
+            defaultValueContainer.style.display = 'block';
+        }
+        if (typeInput.value === 'BooleanField') {
+            variableTypeSelect.value = 'Binary'; // Lock to "Binary"
+            variableTypeSelect.style.display = 'none';
+        } else {
+            variableTypeSelect.style.display = 'block';
+            // Enable or disable the "Yes and No" option based on the selected type
+            if (typeInput.value === 'StringField' || typeInput.value === 'TextAreaField') {
+                for (const option of variableTypeSelect.options) {
+                    if (option.value === 'Binary') {
+                        option.disabled = true;
+                    } else {
+                        option.disabled = false;
+                    }
+                }
+            }
+        }
+
+        function confirmDelete(entryId) {
+            const confirmation = confirm('Are you sure you want to delete this entry?');
+            if (confirmation) {
+                // Send an AJAX request to delete the entry
+                fetch(`/delete/${entryId}`, {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Redirect to the index page after successful deletion
+                        window.location.href = ''; // Replace with the actual URL of your index page
+                    } else {
+                        console.error('Failed to delete entry.');
+                    }
+                })
+                .catch(error => {
+                    console.error(error);
+                });
+            }
         }
     </script>
 </body>

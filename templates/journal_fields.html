@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Entries</title>
+
+    </script>
+</head>
+<body>
+    <form method="POST" action="{{ url_for('update_active') }}">
+        <h1>Entries</h1>
+        <table>
+            <tr>
+                <th>Entry</th>
+                <th>Type</th>
+                <th>variable_type</th>
+                <th>Default Type</th>
+                <th>Default Value</th>
+                <th>Choices</th>
+                <th>Active</th>
+            </tr>
+            {% for entry in entries %}
+            <tr>
+                <td>{{ entry[1] }}</td>
+                <td>{{ entry[2] }}</td>
+                <td>{{ entry[3] }}</td>
+                <td>{{ entry[4] }}</td>
+                <td>{{ entry[5] }}</td>
+                <td>{{ entry[6] }}</td>
+                <td>
+                    <input type="checkbox" name="entry_update" value="{{ entry[0] }}" {% if entry[7] == 1 %}checked{% endif %} onchange="updateActive({{ entry[0] }}, this.checked)">
+                </td>
+                
+                <td><a href="{{ url_for('edit', id=entry[0]) }}">Edit</a></td>
+            </tr>
+            {% endfor %}
+        </table>
+        <button type="submit">Update Active</button>
+    </form>
+    <a href="{{ url_for('add') }}">Add Entry</a>
+    <p>{{ result_message }}</p>
+</body>
+</html>
