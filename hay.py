@@ -61,6 +61,21 @@ cursor.execute( """CREATE TABLE IF NOT EXISTS entries (
 );"""
 )
 conn.close()
+def get_entries():
+    conn = sqlite3.connect('journal.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM entries")
+    entries = cursor.fetchall()
+    
+    #
+    
+    sql_query = "SELECT * FROM entries"
+    # Get the data from the database using pandas
+   # df = pd.read_sql_query(sql_query, conn)
+    #df = ef.decrypt_df(df, ['entry','type','variable_type','default_type','default_value','choices','active'])
+
+    conn.close()
+    return entries
 
 # Define a form for editing and adding rows
 class EntryForm(FlaskForm):
@@ -71,26 +86,20 @@ class EntryForm(FlaskForm):
     default_value = StringField('Default Value')
     choices = StringField('Choices')
 # Helper function to fetch data from the database
-def get_entries():
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM entries")
-    entries = cursor.fetchall()
-    conn.close()
-    return entries
 
-     
 #Import the json config file that defines the form entries
 with open('config.json') as f:
     form_fields = json.load(f)
 
-def check_entry_data(data, current_var_names):
-#Add some error checking
-#Check to make sure Select and Radio Fields have a correct number items in their choices
-    message = ''
-    if data['entry'] in current_var_names:
-        message = 'Sorry, it looks like you already have another variable with this name!'
+print(form_fields)
+form_field_rows = af.get_entries()
 
+def check_entry_data(data):
+    print('checkng entrise')
+#Add some error checking
+#Check to make sure Select and Radio Fields have a correct number items in their choices and that the variable type matches
+    message = ''
+    print(data)
     if data['type'] in ['SelectField', 'RadioField']:
 
         try: 
@@ -122,13 +131,19 @@ def check_entry_data(data, current_var_names):
                 if binary_list.count(0) != 1 and binary_list.count(1) != 1:
                     message = 'A binary variable has to have a 1 and a 0 in it'
 
-
-
+        if data['default_type'] == 'Default Value':
+            default_value_in_choices = False
+            for tup in choices_list_tuple_list:
+              print(tup[0])
+              print(data['default_value'])
+              if tup[0] == data['default_value']:
+                  default_value_in_choices = True
+            if default_value_in_choices == False:
+                message = 'Your default value is not one of the options in your choices'      
 
 #'Boolean fields Need to be Boolean        
     if data['type'] == 'BooleanField':
         if  (data['default_type']=='Default Value'):
-            print(data['default_value'])
             if (data['default_value'] not in ['True', 'False']):
                 message = 'Your default value for a Boolean can only be True or False'
 
@@ -146,6 +161,10 @@ def check_entry_data(data, current_var_names):
                     data['default_value'] = int(data['default_value'])
             except ValueError:
                 message = 'You chose Number as your default value, but this value is a string'
+
+    if data['default_type']=='Default Value' and data['default_value'] == '':
+        message = 'You set that there should be a default value but left the value blank'
+
     return message
 
 #Dynamically generate a form based on the Json file
@@ -162,8 +181,7 @@ def create_form_class(form_fields, date_to_load):
     #If there is an entry, we go through each of the entry names and see if it is in our config file
     #Then we load only those that are in the config file, query that day of data, decrypt and delete those rows
     #reupload that data without the rows, then insert the data from our form
-    print('------------------------------------------------')
-    print('date to load = ' + str(date_to_load))
+
     if date_to_load:
         
         date_to_load_query = f"SELECT * FROM journal WHERE for_date = '{date_to_load.strftime('%Y-%m-%d')}'"
@@ -185,13 +203,8 @@ def create_form_class(form_fields, date_to_load):
         latest_data = pd.read_sql_query(latest_query, conn)
         latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
 
-    print('date_to_load_columns: ' + str(date_to_load_columns))
-   
-    print('latest data: ' + str(latest_data))
 
     for field_name, field_data in form_fields.items():
-        print('field name:' + str(field_name))
-        print(field_data)
         if ((field_data['label'] in date_to_load_columns) or (not latest_data.empty)) or latest_data.empty:
             field_type = getattr(wtforms, field_data['type'])
             field_args = {
@@ -199,15 +212,14 @@ def create_form_class(form_fields, date_to_load):
                 'validators': [getattr(wtforms.validators, v['type'])() for v in field_data['validators']],
                 'default' : field_data.get('default', None)
                         }
-            print(field_args)
+           
             if date_to_load and not date_to_load_data.empty:
-                print(date_to_load_data.loc[date_to_load_data['entry']==field_data['label'], 'value'].values[0]   )
+                
                 field_args['default'] = date_to_load_data.loc[date_to_load_data['entry']==field_data['label'], 'value'].values[0]
             elif field_data.get('load_previous_value', None):
                 c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_data['label'],))
                 row = c.fetchone()
                 if row != None:
-                    #print(row[0])
                     field_args['default'] = row[0]
 
             #We need to seperate Select and Radio fields because they have a choice field 
@@ -292,7 +304,6 @@ def form():
                     
                     c = conn.cursor()
                     row_insert_query = f"INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES ({str(datetime.now())}, {selected_date.date()}, {ef.encrypt_value(field.name)},{ef.encrypt_value(field.data)},{ef.encrypt_value(form_fields[field.name]['value_data_type'])})"
-                    #print('row insert query: ' + str(row_insert_query))
                     c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),selected_date.date(),ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(form_fields[field.name]['value_data_type'])))
                     conn.commit()
                 except:
@@ -348,23 +359,30 @@ def download_file():
 
 @app.route('/journal_fields')
 def index():
-    entries = get_entries()
-    print(entries)
+    conn = sqlite3.connect('journal.db')
+    cursor = conn.cursor()
+    sql_query = "SELECT * FROM entries"
+    # Get the data from the database using pandas
+    encrypted_entries = pd.read_sql_query(sql_query, conn) 
+    conn.close()
 
-    return render_template('journal_fields.html', entries=entries)
+
+    #decrypted_entries = ef.decrypt_df(encrypted_entries, ['entry','type','variable_type','default_type','default_value','choices'])
+    decrypted_entries = af.get_entries()
+
+    return render_template('journal_fields.html', entries=decrypted_entries.values.tolist())
 
 @app.route('/update_active', methods=['POST'])
 def update_active():
     if request.method == 'POST':
+
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
-
         # Get the list of entry IDs and their new "active" status from the form
         entry_ids = request.form.getlist('entry_update')
 
         cursor.execute("UPDATE entries SET active=0")
         for entry_id in entry_ids:
-            print(entry_id)
             cursor.execute("UPDATE entries SET active=1 WHERE id=?", (entry_id,))  
 
         conn.commit()
@@ -375,24 +393,18 @@ def update_active():
 def add():
     form = EntryForm()
     message = ''
+    decrypted_entries = af.get_entries()
 
-    conn = sqlite3.connect('journal.db')
-    cursor = conn.cursor()
-    sql_query = "SELECT * FROM entries"
-    # Get the data from the database using pandas
-    current_entries = pd.read_sql_query(sql_query, conn)
- 
 
-    conn.close()
-
-    print(current_entries)
-    print('-----------------------------------------------')
-    current_var_names = current_entries.entry.unique()
+    current_var_names = decrypted_entries.entry.unique()
 
     if form.validate_on_submit():
         data = form.data
-
-        message = check_entry_data(data, current_var_names)
+        
+        message = check_entry_data(data)
+        
+        if data['entry'] in current_var_names:
+            message = 'Sorry, it looks like you already have another variable with this name!'
 
         if message != '':
             return render_template('add.html', form=form, result_message=message)
@@ -400,7 +412,7 @@ def add():
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
         cursor.execute("INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices) VALUES (?, ?, ?, ?, ?, ?)",
-                       (data['entry'], data['type'],data['variable_type'], data['default_type'], data['default_value'], data['choices']))
+                       (ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices'])))
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
@@ -422,13 +434,20 @@ def edit(id):
         return redirect(url_for('index')) 
 
     # Populate the form with existing data
-    form = EntryForm(data={'entry': entry[1], 'type': entry[2], 'variable_type': entry[3], 'default_type': entry[4], 'default_value': entry[5],'choices': entry[6]})
+    form = EntryForm(data={'entry': ef.decrypt_value(entry[1]), 'type': ef.decrypt_value(entry[2]), 'variable_type': ef.decrypt_value(entry[3]), 'default_type': ef.decrypt_value(entry[4]), 'default_value': ef.decrypt_value(entry[5]),'choices': ef.decrypt_value(entry[6])})
 
     if form.validate_on_submit():
         # Update the entry in the database
         data = form.data
+        message = ''
+        message = check_entry_data(data)
+
+        if message != '':
+            return render_template('edit.html', form=form, result_message=message)
+    
+        
         cursor.execute("UPDATE entries SET entry=?, type=?, variable_type=?, default_type=?, default_value=?, choices=? WHERE id=?", (
-            data['entry'], data['type'], data['variable_type'], data['default_type'], data['default_value'], data['choices'], id))
+            ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), id))
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
@@ -438,9 +457,7 @@ def edit(id):
 
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete_entry(id):
-    print('delee')
     if request.method == 'POST':
-        print('delete post')
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
@@ -449,7 +466,6 @@ def delete_entry(id):
         conn.close()
 
         # Return a JSON response to indicate successful deletion
-        print('madeittodelete')
         return redirect(url_for('index'))
         #return render_template('index.html')
 

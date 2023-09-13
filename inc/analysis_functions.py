@@ -10,6 +10,7 @@ from flask import render_template, request
 
 import seaborn as sns
 
+
 def get_x_days_data(num_days, columns_list=['*']):
 # Connect to the SQLite database
     conn = sqlite3.connect('journal.db')
@@ -35,11 +36,25 @@ def get_entire_db():
     # Get the data from the database using pandas
     df = pd.read_sql_query(sql_query, conn)
     df = ef.decrypt_df(df, ['entry','value','value_data_type'])
-    print('---sssssssssssssssssssssssssssssssssssssssssssssssssssssss-----------')
 
     conn.close()
 
     return df
+
+
+def get_entries():
+    conn = sqlite3.connect('journal.db')
+    cursor = conn.cursor()
+    sql_query = "SELECT * FROM entries"
+    # Get the data from the database using pandas
+    encrypted_entries = pd.read_sql_query(sql_query, conn) 
+    conn.close()
+
+
+    decrypted_entries = ef.decrypt_df(encrypted_entries, ['entry','type','variable_type','default_type','default_value','choices'])
+    return decrypted_entries
+
+     
 
 def get_trending_dictionary():
     #dict to store our results

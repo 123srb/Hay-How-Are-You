@@ -24,6 +24,20 @@
         {{ form.default_type.label }}
         {{ form.default_type }}
         <br>
+        <div class="form-group" id="default_value-container" style="display: none;">
+            <label for="default_value">Default Value:</label>
+            {{ form.default_value.label }}
+            {{ form.default_value }}
+
+            {% if form.default_value.errors %}
+            <ul class="errors">
+                {% for error in form.default_value.errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        <br>
         <div class="form-group" id="choices-container" style="display: none;">
             <label for="choices">Choices:</label>
             {{ form.choices.label }}
