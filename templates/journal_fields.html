@@ -18,6 +18,7 @@
                 <th>Default Value</th>
                 <th>Choices</th>
                 <th>Active</th>
+                <th>Form Order</th>
             </tr>
             {% for entry in entries %}
             <tr>
@@ -30,12 +31,16 @@
                 <td>
                     <input type="checkbox" name="entry_update" value="{{ entry[0] }}" {% if entry[7] == 1 %}checked{% endif %} onchange="updateActive({{ entry[0] }}, this.checked)">
                 </td>
+                <td><input type="text" name="form_order" value="{{ entry[8] }}">
+                    <input type="hidden" name="entry_id" value="{{ entry[0] }}">
+                </td>
                 
                 <td><a href="{{ url_for('edit', id=entry[0]) }}">Edit</a></td>
+                
             </tr>
             {% endfor %}
         </table>
-        <button type="submit">Update Active</button>
+        <button type="submit">Update</button>
     </form>
     <a href="{{ url_for('add') }}">Add Entry</a>
     <p>{{ result_message }}</p>

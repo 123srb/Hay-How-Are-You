@@ -55,9 +55,11 @@ cursor.execute( """CREATE TABLE IF NOT EXISTS entries (
     variable_type TEXT NOT NULL,
     default_type TEXT,
     default_value TEXT,
-    choices TEXT,
-    active INTEGER DEFAULT 1
-    
+    choices TEXT, 
+    active INTEGER DEFAULT 1,
+    form_order INTEGER,
+    validators TEXT DEFAULT "[{'type': 'DataRequired'}]"
+               
 );"""
 )
 conn.close()
@@ -91,8 +93,11 @@ class EntryForm(FlaskForm):
 with open('config.json') as f:
     form_fields = json.load(f)
 
-print(form_fields)
-form_field_rows = af.get_entries()
+#print(form_fields)
+
+#print(form_field_rows)
+#print('neeeeewwwwww')
+#print(form_field_rows.set_index('entry').to_dict(orient='index' ))
 
 def check_entry_data(data):
     print('checkng entrise')
@@ -168,7 +173,13 @@ def check_entry_data(data):
     return message
 
 #Dynamically generate a form based on the Json file
-def create_form_class(form_fields, date_to_load):
+def create_form_class(date_to_load):
+    form_fields = af.get_entries(just_active=True)
+    form_fields['validators'] = form_fields['validators'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else None)
+    form_fields = form_fields.set_index('entry').to_dict(orient='index' )
+
+    print(form_fields)
+    print(date_to_load)
     date_to_load_columns=[]
     latest_data=pd.DataFrame()
     #Connect to database
@@ -203,12 +214,15 @@ def create_form_class(form_fields, date_to_load):
         latest_data = pd.read_sql_query(latest_query, conn)
         latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
 
-
     for field_name, field_data in form_fields.items():
-        if ((field_data['label'] in date_to_load_columns) or (not latest_data.empty)) or latest_data.empty:
+        if ((field_name in date_to_load_columns) or (not latest_data.empty)) or latest_data.empty:
+            print(field_data['validators'])
+
+            print(type(field_data['validators']))
+            
             field_type = getattr(wtforms, field_data['type'])
             field_args = {
-                'label': field_data['label'],
+                'label': field_name,
                 'validators': [getattr(wtforms.validators, v['type'])() for v in field_data['validators']],
                 'default' : field_data.get('default', None)
                         }
@@ -217,7 +231,7 @@ def create_form_class(form_fields, date_to_load):
                 
                 field_args['default'] = date_to_load_data.loc[date_to_load_data['entry']==field_data['label'], 'value'].values[0]
             elif field_data.get('load_previous_value', None):
-                c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_data['label'],))
+                c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_name,))
                 row = c.fetchone()
                 if row != None:
                     field_args['default'] = row[0]
@@ -267,7 +281,7 @@ def form():
     else:
         selected_date = date.today()
 
-    dynamic_form_class, columns_to_delete= create_form_class(form_fields, date_to_load=selected_date)
+    dynamic_form_class, columns_to_delete= create_form_class( date_to_load=selected_date)
     form = dynamic_form_class(request.form)
 
     if request.method == 'POST':
@@ -361,7 +375,7 @@ def download_file():
 def index():
     conn = sqlite3.connect('journal.db')
     cursor = conn.cursor()
-    sql_query = "SELECT * FROM entries"
+    sql_query = "SELECT * FROM entries ORDER BY form_order"
     # Get the data from the database using pandas
     encrypted_entries = pd.read_sql_query(sql_query, conn) 
     conn.close()
@@ -375,15 +389,24 @@ def index():
 @app.route('/update_active', methods=['POST'])
 def update_active():
     if request.method == 'POST':
-
+        print(request.form )
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
         # Get the list of entry IDs and their new "active" status from the form
-        entry_ids = request.form.getlist('entry_update')
+        entry_updates = request.form.getlist('entry_update')
 
+        
         cursor.execute("UPDATE entries SET active=0")
-        for entry_id in entry_ids:
+        for entry_id in entry_updates:
             cursor.execute("UPDATE entries SET active=1 WHERE id=?", (entry_id,))  
+
+        form_order = request.form.getlist('form_order')
+        entry_id = request.form.getlist('entry_id')
+        for id, order in zip(entry_id, form_order):
+            print(id)
+            print(order)
+            cursor.execute("UPDATE entries SET form_order=? WHERE id=?", (order, id,))  
+
 
         conn.commit()
         conn.close()
@@ -411,7 +434,7 @@ def add():
 
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices) VALUES (?, ?, ?, ?, ?, ?)",
+        cursor.execute("INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices, form_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT IFNULL(MAX(form_order) + 1, 1) FROM entries))",
                        (ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices'])))
         conn.commit()
         conn.close()

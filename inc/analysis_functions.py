@@ -42,10 +42,13 @@ def get_entire_db():
     return df
 
 
-def get_entries():
+def get_entries(just_active=False):
     conn = sqlite3.connect('journal.db')
     cursor = conn.cursor()
-    sql_query = "SELECT * FROM entries"
+    if just_active == False:
+        sql_query = "SELECT * FROM entries ORDER BY form_order"
+    else:
+        sql_query = "SELECT * FROM entries WHERE active=1 ORDER BY form_order"
     # Get the data from the database using pandas
     encrypted_entries = pd.read_sql_query(sql_query, conn) 
     conn.close()
