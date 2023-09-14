@@ -373,6 +373,7 @@ def download_file():
 
 @app.route('/journal_fields')
 def index():
+    message = ''
     conn = sqlite3.connect('journal.db')
     cursor = conn.cursor()
     sql_query = "SELECT * FROM entries ORDER BY form_order"
@@ -384,11 +385,13 @@ def index():
     #decrypted_entries = ef.decrypt_df(encrypted_entries, ['entry','type','variable_type','default_type','default_value','choices'])
     decrypted_entries = af.get_entries()
 
-    return render_template('journal_fields.html', entries=decrypted_entries.values.tolist())
+    return render_template('journal_fields.html', entries=decrypted_entries.values.tolist(), result_message= message)
 
 @app.route('/update_active', methods=['POST'])
 def update_active():
     if request.method == 'POST':
+
+   
         print(request.form )
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
@@ -402,6 +405,15 @@ def update_active():
 
         form_order = request.form.getlist('form_order')
         entry_id = request.form.getlist('entry_id')
+
+        for order in form_order:
+            if order<1:
+                return redirect(url_for('index'))
+        
+        if  len(form_order) != len(set(form_order)):
+            return redirect(url_for('index'))
+            
+
         for id, order in zip(entry_id, form_order):
             print(id)
             print(order)
