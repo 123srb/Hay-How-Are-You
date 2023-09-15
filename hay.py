@@ -1,6 +1,6 @@
 import sys
 sys.path.append('/inc')
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, flash, session
 from flask_wtf import FlaskForm
 from wtforms import DateField, DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField 
 from wtforms.validators import DataRequired, Email, Optional, NumberRange
@@ -20,7 +20,7 @@ import matplotlib.dates as mdates
 import plotly.express as px
 import io
 import ast
-
+import os
 
 #Check to make sure we have an encryption key, if not, it will make one
 ef.check_key()
@@ -30,9 +30,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret_key' # Change this to a strong, random value
 app.config['DATABASE'] = 'journal.db'
 
-import os
+
 current_directory = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(current_directory, 'journal.db')
+db_path = os.path.join(current_directory, app.config['DATABASE'])
 conn = sqlite3.connect(db_path)
 # Connect to database
 #conn = sqlite3.connect('/journal.db')
@@ -46,7 +46,7 @@ conn.close()
 DATABASE = 'journal.db'
 
 
-conn = sqlite3.connect(DATABASE)
+conn = sqlite3.connect(app.config['DATABASE'])
 cursor = conn.cursor()
 cursor.execute( """CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,21 +90,13 @@ class EntryForm(FlaskForm):
 # Helper function to fetch data from the database
 
 #Import the json config file that defines the form entries
-with open('config.json') as f:
-    form_fields = json.load(f)
 
-#print(form_fields)
 
-#print(form_field_rows)
-#print('neeeeewwwwww')
-#print(form_field_rows.set_index('entry').to_dict(orient='index' ))
 
 def check_entry_data(data):
-    print('checkng entrise')
 #Add some error checking
 #Check to make sure Select and Radio Fields have a correct number items in their choices and that the variable type matches
     message = ''
-    print(data)
     if data['type'] in ['SelectField', 'RadioField']:
 
         try: 
@@ -139,8 +131,7 @@ def check_entry_data(data):
         if data['default_type'] == 'Default Value':
             default_value_in_choices = False
             for tup in choices_list_tuple_list:
-              print(tup[0])
-              print(data['default_value'])
+     
               if tup[0] == data['default_value']:
                   default_value_in_choices = True
             if default_value_in_choices == False:
@@ -178,8 +169,6 @@ def create_form_class(date_to_load):
     form_fields['validators'] = form_fields['validators'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else None)
     form_fields = form_fields.set_index('entry').to_dict(orient='index' )
 
-    print(form_fields)
-    print(date_to_load)
     date_to_load_columns=[]
     latest_data=pd.DataFrame()
     #Connect to database
@@ -216,10 +205,7 @@ def create_form_class(date_to_load):
 
     for field_name, field_data in form_fields.items():
         if ((field_name in date_to_load_columns) or (not latest_data.empty)) or latest_data.empty:
-            print(field_data['validators'])
-
-            print(type(field_data['validators']))
-            
+              
             field_type = getattr(wtforms, field_data['type'])
             field_args = {
                 'label': field_name,
@@ -373,7 +359,7 @@ def download_file():
 
 @app.route('/journal_fields')
 def index():
-    message = ''
+    message = session.pop('error', '')
     conn = sqlite3.connect('journal.db')
     cursor = conn.cursor()
     sql_query = "SELECT * FROM entries ORDER BY form_order"
@@ -391,8 +377,6 @@ def index():
 def update_active():
     if request.method == 'POST':
 
-   
-        print(request.form )
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
         # Get the list of entry IDs and their new "active" status from the form
@@ -403,20 +387,29 @@ def update_active():
         for entry_id in entry_updates:
             cursor.execute("UPDATE entries SET active=1 WHERE id=?", (entry_id,))  
 
+        conn.commit()
+        conn.close()
         form_order = request.form.getlist('form_order')
         entry_id = request.form.getlist('entry_id')
 
         for order in form_order:
-            if order<1:
-                return redirect(url_for('index'))
+            try:
+                order_int = int(order)
+                if order_int<1:
+                    session['error'] = 'Your from order needs to be > 0'
+                    
+                    return redirect(url_for('index'))
+            except:
+              session['error'] = 'Form order values must be integers'
+              return redirect(url_for('index'))
         
         if  len(form_order) != len(set(form_order)):
+            session['error'] = 'Duplicate form order values are not allowed.'
             return redirect(url_for('index'))
             
-
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
         for id, order in zip(entry_id, form_order):
-            print(id)
-            print(order)
             cursor.execute("UPDATE entries SET form_order=? WHERE id=?", (order, id,))  
 
 
