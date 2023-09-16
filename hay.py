@@ -2,8 +2,8 @@ import sys
 sys.path.append('/inc')
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, flash, session
 from flask_wtf import FlaskForm
-from wtforms import DateField, DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField 
-from wtforms.validators import DataRequired, Email, Optional, NumberRange
+from wtforms import DateField, DecimalField, StringField, IntegerField, SelectField, TextAreaField, BooleanField, SubmitField, RadioField, validators
+from wtforms.validators import DataRequired, Email, Optional, NumberRange, ValidationError
 import wtforms.validators
 import sqlite3
 from datetime import date
@@ -32,6 +32,8 @@ class CheckmarkWidget(CheckboxInput):
         else:
             # If the field is False, render an empty field
             return super(CheckmarkWidget, self).__call__(field, checked=False, **kwargs)
+
+
 
 #Check to make sure we have an encryption key, if not, it will make one
 ef.check_key()
@@ -65,8 +67,7 @@ c.execute( """CREATE TABLE IF NOT EXISTS entries (
     default_value TEXT,
     choices TEXT, 
     active INTEGER DEFAULT 1,
-    form_order INTEGER,
-    validators TEXT DEFAULT "[{'type': 'DataRequired'}]" );""")
+    form_order INTEGER );""")
 
 conn.close()
 
@@ -74,7 +75,7 @@ conn.close()
 # Define a form for editing and adding rows
 class EntryForm(FlaskForm):
     entry = StringField('Entry', validators=[DataRequired()])
-    type = SelectField('Type', choices=[('StringField', 'StringField'), ('TextAreaField', 'TextAreaField'), ('BooleanField', 'BooleanField'), ('SelectField', 'SelectField'), ('RadioField', 'RadioField')])
+    type = SelectField('Type', choices=[('StringField', 'StringField'), ('TextAreaField', 'TextAreaField'), ('BooleanField', 'BooleanField'), ('SelectField', 'SelectField'), ('RadioField', 'RadioField'), ('IntegerField', 'IntegerField'), ('DecimalField', 'DecimalField')])
     variable_type = SelectField('Variable Type', choices=[('String', 'Text'), ('Binary', 'Yes or No'), ('Integer', 'Numeric')] ) 
     default_type = SelectField('Default Type',  choices=[('Empty', 'Empty'), ('Default Value', 'Default Value'), ('Load Previous Value', 'Load Previous Value')] )
     default_value = StringField('Default Value')
@@ -151,7 +152,7 @@ def check_entry_data(data):
 def create_form_class(date_to_load):
     #get entries and them format the validators into a list of dicts
     form_fields = af.get_entries(just_active=True)
-    form_fields['validators'] = form_fields['validators'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else None)
+    #form_fields['validators'] = form_fields['validators'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else None)
     
     #form_fields['choices'] = form_fields['choices'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else None)
     form_fields = form_fields.set_index('entry').to_dict(orient='index' )
@@ -171,8 +172,7 @@ def create_form_class(date_to_load):
     if date_to_load:
         
         date_to_load_query = f"SELECT * FROM journal WHERE for_date = '{date_to_load.strftime('%Y-%m-%d')}'"
-        print(date_to_load)
-        print(date_to_load_query)
+
         date_to_load_data = pd.read_sql_query(date_to_load_query, conn)
     
         if not date_to_load_data.empty:
@@ -190,6 +190,7 @@ def create_form_class(date_to_load):
         latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
         latest_data = pd.read_sql_query(latest_query, conn)
         latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
+    #validators_list = [DataRequired()]
 
     for field_name, field_data in form_fields.items():
         #print(field_data)
@@ -198,15 +199,19 @@ def create_form_class(date_to_load):
         if ((field_name in date_to_load_columns) or (not latest_data.empty)) or latest_data.empty:
             #Set the default field information for the form
             field_type = getattr(wtforms, field_data['type'])
+            #validator_names = [validator.strip() for validator in field_data['validators'].split(',')]
+            #validators_list = [validator_mapping[name] for name in validator_names]
+
+
+          #  print(validators_list)
             field_args = {
                 'label': field_name,
-                'validators': [getattr(wtforms.validators, v['type'])() for v in field_data['validators']],
+                'validators': [DataRequired()],
                 'default' : field_data.get('default_value', None)
                         }
             #if there is already an entry for that date, let's use it 
             if date_to_load and not date_to_load_data.empty:
-                print(date_to_load_data.loc[date_to_load_data['entry']==field_name, 'value'])
-                print(date_to_load_data)
+                
                 #we will try to set the value based on what currently exists, but there is a fringe case 
                 #If a new form entry is added, there is data for the day and the value is in our form_entries
                 #but there is no data for that form value so it would be an error
@@ -261,7 +266,8 @@ def create_form_class(date_to_load):
 def form():
     message = ''
     entry_settings = af.get_entries()
-    print(entry_settings.columns)
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+        print(entry_settings)
     #check get, and then the form for the selected date, if neither are set default to todays date
     if request.args.get('selected_date'):
         raw_date = request.args.get('selected_date')
@@ -299,14 +305,18 @@ def form():
         conn.commit()
 
         for field in form: 
-            #print('-----')
-            #print(field)
+            print('-----' + str(field.name) + ' ' + str(field.data))
+       
+        
+
             #check if the values name is in the form, and there is data for it.  
             #csrf token gets automatically passed so we dont want that or our selected date because we use that for the field
             #finally this last if is to check if the field name is one of the columns we deleted for editing a day or has no information as in a new day
             
             #if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and (field.name in columns_to_delete or not columns_to_delete) :
-            if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and (field.name in columns_to_delete or not columns_to_delete) :
+            if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date':
+                print('passed ' + str(field.name))
+
                 try:
                     
                     c = conn.cursor()
@@ -314,7 +324,7 @@ def form():
                     #print(row_insert_query)
                     #c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),selected_date.date(),ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(field.value_data_type)))
                     row_insert_query = "INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?,?,?,?,?)"
-                    values = (str(datetime.now()), selected_date.date(), ef.encrypt_value(field.name),ef.encrypt_value(field.data),ef.encrypt_value(entry_settings[entry_settings['entry'] == field.name]['variable_type'][0]))
+                    values = (str(datetime.now()), selected_date.date(), ef.encrypt_value(field.name),ef.encrypt_value(field.data),ef.encrypt_value(entry_settings[entry_settings['entry'] == field.name]['variable_type'].values[0]))
                     print('999999999')
                     print(row_insert_query)
                     print(values)
@@ -444,10 +454,15 @@ def add():
     #Get the first unused value to add for the form order, that way we can give thing we want to show at the bottom large numbers
     sorted_form_order = sorted(decrypted_entries['form_order'])
     first_unused_order_num = None
-    for i, value in enumerate(sorted_form_order):
-        if value != i + 1:
-            first_unused_order_num = i + 1
-            break
+    if not sorted_form_order:
+        first_unused_order_num = 1
+    else:
+        for i, value in enumerate(sorted_form_order):
+            if value != i + 1:
+                first_unused_order_num = i + 1
+                break
+            else:
+                first_unused_order_num = len(sorted_form_order) + 1
 
 
     if form.validate_on_submit():
@@ -461,15 +476,11 @@ def add():
         if message != '':
             return render_template('add.html', form=form, result_message=message)
 
-        if data['variable_type'] == 'Integer':
-            validation = "[{'type': 'DataRequired', 'type':'NumberRange'}]"
-        else:
-            validation = "[{'type': 'DataRequired'}]"
 
         conn = sqlite3.connect(app.config['DATABASE'])
         cursor = conn.cursor()
-        query = "INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices, form_order, validators) VALUES (?,?,?,?,?,?,?, ? )"
-        values = (ef.encrypt_value(data['entry']),ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), first_unused_order_num, validation)
+        query = "INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices, form_order) VALUES (?,?,?,?,?,?,?)"
+        values = (ef.encrypt_value(data['entry']),ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), first_unused_order_num)
         print(query)
         #cursor.execute("INSERT INTO entries (entry, type, value_data_type, default_type, default_value, choices, form_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT IFNULL(MAX(form_order) + 1, 1) FROM entries))",
         #               (ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['value_data_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices'])))
@@ -505,14 +516,9 @@ def edit(id):
 
         if message != '':
             return render_template('edit.html', form=form, result_message=message)
-
-        if data['variable_type'] == 'Integer':
-            validation = "[{'type': 'DataRequired', 'type':'NumberRange'}]"
-        else:
-            validation = "[{'type': 'DataRequired'}]"
         
-        cursor.execute("UPDATE entries SET entry=?, type=?, variable_type=?, default_type=?, default_value=?, choices=?, validators=? WHERE id=?", (
-            ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), validation, id))
+        cursor.execute("UPDATE entries SET entry=?, type=?, variable_type=?, default_type=?, default_value=?, choices=? WHERE id=?", (
+            ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), id))
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
