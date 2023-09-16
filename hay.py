@@ -315,7 +315,10 @@ def form():
                     #c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),selected_date.date(),ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(field.value_data_type)))
                     row_insert_query = "INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?,?,?,?,?)"
                     values = (str(datetime.now()), selected_date.date(), ef.encrypt_value(field.name),ef.encrypt_value(field.data),ef.encrypt_value(entry_settings[entry_settings['entry'] == field.name]['variable_type'][0]))
-   
+                    print('999999999')
+                    print(row_insert_query)
+                    print(values)
+
                     c.execute(row_insert_query, values) 
                     conn.commit()
                 except:
@@ -438,6 +441,15 @@ def add():
 
     current_var_names = decrypted_entries.entry.unique()
 
+    #Get the first unused value to add for the form order, that way we can give thing we want to show at the bottom large numbers
+    sorted_form_order = sorted(decrypted_entries['form_order'])
+    first_unused_order_num = None
+    for i, value in enumerate(sorted_form_order):
+        if value != i + 1:
+            first_unused_order_num = i + 1
+            break
+
+
     if form.validate_on_submit():
         data = form.data
         
@@ -449,10 +461,15 @@ def add():
         if message != '':
             return render_template('add.html', form=form, result_message=message)
 
+        if data['variable_type'] == 'Integer':
+            validation = "[{'type': 'DataRequired', 'type':'NumberRange'}]"
+        else:
+            validation = "[{'type': 'DataRequired'}]"
+
         conn = sqlite3.connect(app.config['DATABASE'])
         cursor = conn.cursor()
-        query = "INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices, form_order) VALUES (?,?,?,?,?,?, (SELECT IFNULL(MAX(form_order) + 1, 1) FROM entries) )"
-        values = (ef.encrypt_value(data['entry']),ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']))
+        query = "INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices, form_order, validators) VALUES (?,?,?,?,?,?,?, ? )"
+        values = (ef.encrypt_value(data['entry']),ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), first_unused_order_num, validation)
         print(query)
         #cursor.execute("INSERT INTO entries (entry, type, value_data_type, default_type, default_value, choices, form_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT IFNULL(MAX(form_order) + 1, 1) FROM entries))",
         #               (ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['value_data_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices'])))
@@ -478,7 +495,7 @@ def edit(id):
         return redirect(url_for('index')) 
 
     # Populate the form with existing data
-    form = EntryForm(data={'entry': ef.decrypt_value(entry[1]), 'type': ef.decrypt_value(entry[2]), 'value_data_type': ef.decrypt_value(entry[3]), 'default_type': ef.decrypt_value(entry[4]), 'default_value': ef.decrypt_value(entry[5]),'choices': ef.decrypt_value(entry[6])})
+    form = EntryForm(data={'entry': ef.decrypt_value(entry[1]), 'type': ef.decrypt_value(entry[2]), 'variable_type': ef.decrypt_value(entry[3]), 'default_type': ef.decrypt_value(entry[4]), 'default_value': ef.decrypt_value(entry[5]),'choices': ef.decrypt_value(entry[6])})
 
     if form.validate_on_submit():
         # Update the entry in the database
@@ -488,10 +505,14 @@ def edit(id):
 
         if message != '':
             return render_template('edit.html', form=form, result_message=message)
-    
+
+        if data['variable_type'] == 'Integer':
+            validation = "[{'type': 'DataRequired', 'type':'NumberRange'}]"
+        else:
+            validation = "[{'type': 'DataRequired'}]"
         
-        cursor.execute("UPDATE entries SET entry=?, type=?, variable_type=?, default_type=?, default_value=?, choices=? WHERE id=?", (
-            ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['value_data_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), id))
+        cursor.execute("UPDATE entries SET entry=?, type=?, variable_type=?, default_type=?, default_value=?, choices=?, validators=? WHERE id=?", (
+            ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), validation, id))
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
