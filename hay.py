@@ -22,6 +22,17 @@ import io
 import ast
 import os
 
+from wtforms.widgets import CheckboxInput
+
+class CheckmarkWidget(CheckboxInput):
+    def __call__(self, field, **kwargs):
+        if field.data:
+            # If the field is True, render a checkmark
+            return super(CheckmarkWidget, self).__call__(field, checked=True, **kwargs)
+        else:
+            # If the field is False, render an empty field
+            return super(CheckmarkWidget, self).__call__(field, checked=False, **kwargs)
+
 #Check to make sure we have an encryption key, if not, it will make one
 ef.check_key()
 
@@ -30,25 +41,22 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret_key' # Change this to a strong, random value
 app.config['DATABASE'] = 'journal.db'
 
-
+#create the path to where the file is, and create the database if it doesn't exist
 current_directory = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(current_directory, app.config['DATABASE'])
 conn = sqlite3.connect(db_path)
-# Connect to database
-#conn = sqlite3.connect('/journal.db')
 c = conn.cursor()
 
-# Create table if it does not exist
-c.execute('''CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY, date_time_stamp TEXT, for_date TEXT, entry TEXT, value TEXT, value_data_type TEXT)''')
+# Create journal if it does not exist
+c.execute('''CREATE TABLE IF NOT EXISTS journal (
+          id INTEGER PRIMARY KEY, 
+          date_time_stamp TEXT, 
+          for_date TEXT, 
+          entry TEXT, 
+          value TEXT, 
+          value_data_type TEXT)''')
 
-conn.close()
-
-DATABASE = 'journal.db'
-
-
-conn = sqlite3.connect(app.config['DATABASE'])
-cursor = conn.cursor()
-cursor.execute( """CREATE TABLE IF NOT EXISTS entries (
+c.execute( """CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entry TEXT NOT NULL,
     type TEXT NOT NULL,
@@ -58,26 +66,10 @@ cursor.execute( """CREATE TABLE IF NOT EXISTS entries (
     choices TEXT, 
     active INTEGER DEFAULT 1,
     form_order INTEGER,
-    validators TEXT DEFAULT "[{'type': 'DataRequired'}]"
-               
-);"""
-)
-conn.close()
-def get_entries():
-    conn = sqlite3.connect('journal.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM entries")
-    entries = cursor.fetchall()
-    
-    #
-    
-    sql_query = "SELECT * FROM entries"
-    # Get the data from the database using pandas
-   # df = pd.read_sql_query(sql_query, conn)
-    #df = ef.decrypt_df(df, ['entry','type','variable_type','default_type','default_value','choices','active'])
+    validators TEXT DEFAULT "[{'type': 'DataRequired'}]" );""")
 
-    conn.close()
-    return entries
+conn.close()
+
 
 # Define a form for editing and adding rows
 class EntryForm(FlaskForm):
@@ -87,28 +79,20 @@ class EntryForm(FlaskForm):
     default_type = SelectField('Default Type',  choices=[('Empty', 'Empty'), ('Default Value', 'Default Value'), ('Load Previous Value', 'Load Previous Value')] )
     default_value = StringField('Default Value')
     choices = StringField('Choices')
-# Helper function to fetch data from the database
-
-#Import the json config file that defines the form entries
-
-
 
 def check_entry_data(data):
 #Add some error checking
 #Check to make sure Select and Radio Fields have a correct number items in their choices and that the variable type matches
     message = ''
     if data['type'] in ['SelectField', 'RadioField']:
-
         try: 
             choices_list_tuple_list = ast.literal_eval(data['choices'])
         except:
             message = 'Sorry, but this does not to be in the right format, please look over the options below and try again'
             return message
-
         if len(choices_list_tuple_list) <= 1:
             message = 'It looks like you do not have multiple values in your choices, please separate each value with a comma'
             return message
-
         strings = 0
         numbers = 0
         for tup in choices_list_tuple_list:
@@ -165,14 +149,16 @@ def check_entry_data(data):
 
 #Dynamically generate a form based on the Json file
 def create_form_class(date_to_load):
+    #get entries and them format the validators into a list of dicts
     form_fields = af.get_entries(just_active=True)
     form_fields['validators'] = form_fields['validators'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else None)
+    
+    #form_fields['choices'] = form_fields['choices'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else None)
     form_fields = form_fields.set_index('entry').to_dict(orient='index' )
-
     date_to_load_columns=[]
     latest_data=pd.DataFrame()
-    #Connect to database
-    conn = sqlite3.connect('journal.db', check_same_thread=False)
+    
+    conn = sqlite3.connect(app.config['DATABASE'], check_same_thread=False)
     c = conn.cursor()
     #Create empty form
     class DynamicForm(FlaskForm):
@@ -185,6 +171,8 @@ def create_form_class(date_to_load):
     if date_to_load:
         
         date_to_load_query = f"SELECT * FROM journal WHERE for_date = '{date_to_load.strftime('%Y-%m-%d')}'"
+        print(date_to_load)
+        print(date_to_load_query)
         date_to_load_data = pd.read_sql_query(date_to_load_query, conn)
     
         if not date_to_load_data.empty:
@@ -204,18 +192,29 @@ def create_form_class(date_to_load):
         latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
 
     for field_name, field_data in form_fields.items():
+        #print(field_data)
+        print('-----------------')
+        
         if ((field_name in date_to_load_columns) or (not latest_data.empty)) or latest_data.empty:
-              
+            #Set the default field information for the form
             field_type = getattr(wtforms, field_data['type'])
             field_args = {
                 'label': field_name,
                 'validators': [getattr(wtforms.validators, v['type'])() for v in field_data['validators']],
-                'default' : field_data.get('default', None)
+                'default' : field_data.get('default_value', None)
                         }
-           
+            #if there is already an entry for that date, let's use it 
             if date_to_load and not date_to_load_data.empty:
-                
-                field_args['default'] = date_to_load_data.loc[date_to_load_data['entry']==field_data['label'], 'value'].values[0]
+                print(date_to_load_data.loc[date_to_load_data['entry']==field_name, 'value'])
+                print(date_to_load_data)
+                #we will try to set the value based on what currently exists, but there is a fringe case 
+                #If a new form entry is added, there is data for the day and the value is in our form_entries
+                #but there is no data for that form value so it would be an error
+                try:
+                    field_args['default'] = date_to_load_data.loc[date_to_load_data['entry']==field_name, 'value'].values[0]
+                except:
+                    pass
+            #if the form field is supposed to load the last value, query it
             elif field_data.get('load_previous_value', None):
                 c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_name,))
                 row = c.fetchone()
@@ -224,10 +223,17 @@ def create_form_class(date_to_load):
 
             #We need to seperate Select and Radio fields because they have a choice field 
             if field_data['type'] == 'SelectField' or field_data['type'] == 'RadioField':
-                field_args['choices'] = [(k, v) for k, v in field_data['choices'][0].items()]
-
-            #Create field and add to form
+                choices_strings = form_fields['choices'].strip('()').split(', ')
+                choices_tuple = [tuple(t.split(', ')) for t in choices_strings]
+                field_args['choices'] = [choices_tuple] 
+                # field_args['choices'] = [(k, v) for k, v in field_data['choices'][0].items()]
+                #field_args['choices'] = field_data['choices']
+             #Create field and add to form
             field = field_type(**field_args)
+
+
+            
+            print(field)
             setattr(DynamicForm, field_name, field)
     conn.close()
 
@@ -238,7 +244,6 @@ def create_form_class(date_to_load):
         default_date=date_to_load
     else: 
         default_date=date.today
-
 
     date_field_args = {
         'default': default_date,
@@ -254,11 +259,10 @@ def create_form_class(date_to_load):
      
 @app.route('/', methods=['GET', 'POST'])
 def form():
-    #create an empty variable to add a message to submit to user
     message = ''
-
+    entry_settings = af.get_entries()
+    print(entry_settings.columns)
     #check get, and then the form for the selected date, if neither are set default to todays date
-
     if request.args.get('selected_date'):
         raw_date = request.args.get('selected_date')
         selected_date = datetime.strptime(raw_date, '%Y-%m-%d')  # Convert string to datetime  
@@ -275,7 +279,7 @@ def form():
         now = datetime.strftime(datetime.now(), "%Y-%m-%d, %H:%M:%S")
         
         #connect to the db and check if there is an entry for today.  If there is delete it and insert the current values
-        conn = sqlite3.connect('journal.db')        
+        conn = sqlite3.connect(app.config['DATABASE'])        
         c = conn.cursor()
   
         #first query the rows for our day
@@ -295,16 +299,24 @@ def form():
         conn.commit()
 
         for field in form: 
-
+            #print('-----')
+            #print(field)
             #check if the values name is in the form, and there is data for it.  
             #csrf token gets automatically passed so we dont want that or our selected date because we use that for the field
             #finally this last if is to check if the field name is one of the columns we deleted for editing a day or has no information as in a new day
+            
+            #if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and (field.name in columns_to_delete or not columns_to_delete) :
             if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and (field.name in columns_to_delete or not columns_to_delete) :
                 try:
                     
                     c = conn.cursor()
-                    row_insert_query = f"INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES ({str(datetime.now())}, {selected_date.date()}, {ef.encrypt_value(field.name)},{ef.encrypt_value(field.data)},{ef.encrypt_value(form_fields[field.name]['value_data_type'])})"
-                    c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),selected_date.date(),ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(form_fields[field.name]['value_data_type'])))
+                    #row_insert_query = f"INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES ({str(datetime.now())}, {selected_date.date()}, {ef.encrypt_value(field.name)},{ef.encrypt_value(field.data)},{ef.encrypt_value(entry_settings[field.name]['value_data_type'])})"
+                    #print(row_insert_query)
+                    #c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),selected_date.date(),ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(field.value_data_type)))
+                    row_insert_query = "INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?,?,?,?,?)"
+                    values = (str(datetime.now()), selected_date.date(), ef.encrypt_value(field.name),ef.encrypt_value(field.data),ef.encrypt_value(entry_settings[entry_settings['entry'] == field.name]['variable_type'][0]))
+   
+                    c.execute(row_insert_query, values) 
                     conn.commit()
                 except:
                     print('issue with: ' + field.name)
@@ -360,7 +372,7 @@ def download_file():
 @app.route('/journal_fields')
 def index():
     message = session.pop('error', '')
-    conn = sqlite3.connect('journal.db')
+    conn = sqlite3.connect(app.config['DATABASE'])
     cursor = conn.cursor()
     sql_query = "SELECT * FROM entries ORDER BY form_order"
     # Get the data from the database using pandas
@@ -377,7 +389,7 @@ def index():
 def update_active():
     if request.method == 'POST':
 
-        conn = sqlite3.connect(DATABASE)
+        conn = sqlite3.connect(app.config['DATABASE'])
         cursor = conn.cursor()
         # Get the list of entry IDs and their new "active" status from the form
         entry_updates = request.form.getlist('entry_update')
@@ -407,7 +419,7 @@ def update_active():
             session['error'] = 'Duplicate form order values are not allowed.'
             return redirect(url_for('index'))
             
-        conn = sqlite3.connect(DATABASE)
+        conn = sqlite3.connect(app.config['DATABASE'])
         cursor = conn.cursor()
         for id, order in zip(entry_id, form_order):
             cursor.execute("UPDATE entries SET form_order=? WHERE id=?", (order, id,))  
@@ -437,10 +449,14 @@ def add():
         if message != '':
             return render_template('add.html', form=form, result_message=message)
 
-        conn = sqlite3.connect(DATABASE)
+        conn = sqlite3.connect(app.config['DATABASE'])
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices, form_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT IFNULL(MAX(form_order) + 1, 1) FROM entries))",
-                       (ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices'])))
+        query = "INSERT INTO entries (entry, type, variable_type, default_type, default_value, choices, form_order) VALUES (?,?,?,?,?,?, (SELECT IFNULL(MAX(form_order) + 1, 1) FROM entries) )"
+        values = (ef.encrypt_value(data['entry']),ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']))
+        print(query)
+        #cursor.execute("INSERT INTO entries (entry, type, value_data_type, default_type, default_value, choices, form_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT IFNULL(MAX(form_order) + 1, 1) FROM entries))",
+        #               (ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['value_data_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices'])))
+        cursor.execute(query,values)
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
@@ -450,7 +466,7 @@ def add():
 # Route for editing an entry
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit(id):
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(app.config['DATABASE'])
     cursor = conn.cursor()
 
     # Fetch the entry to be edited
@@ -462,7 +478,7 @@ def edit(id):
         return redirect(url_for('index')) 
 
     # Populate the form with existing data
-    form = EntryForm(data={'entry': ef.decrypt_value(entry[1]), 'type': ef.decrypt_value(entry[2]), 'variable_type': ef.decrypt_value(entry[3]), 'default_type': ef.decrypt_value(entry[4]), 'default_value': ef.decrypt_value(entry[5]),'choices': ef.decrypt_value(entry[6])})
+    form = EntryForm(data={'entry': ef.decrypt_value(entry[1]), 'type': ef.decrypt_value(entry[2]), 'value_data_type': ef.decrypt_value(entry[3]), 'default_type': ef.decrypt_value(entry[4]), 'default_value': ef.decrypt_value(entry[5]),'choices': ef.decrypt_value(entry[6])})
 
     if form.validate_on_submit():
         # Update the entry in the database
@@ -475,7 +491,7 @@ def edit(id):
     
         
         cursor.execute("UPDATE entries SET entry=?, type=?, variable_type=?, default_type=?, default_value=?, choices=? WHERE id=?", (
-            ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['variable_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), id))
+            ef.encrypt_value(data['entry']), ef.encrypt_value(data['type']), ef.encrypt_value(data['value_data_type']), ef.encrypt_value(data['default_type']), ef.encrypt_value(data['default_value']), ef.encrypt_value(data['choices']), id))
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
@@ -486,7 +502,7 @@ def edit(id):
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete_entry(id):
     if request.method == 'POST':
-        conn = sqlite3.connect(DATABASE)
+        conn = sqlite3.connect(app.config['DATABASE'])
         cursor = conn.cursor()
 
         cursor.execute("DELETE FROM entries WHERE id=?", (id,))

@@ -12,31 +12,37 @@
         <h1>Entries</h1>
         <table>
             <tr>
+                <th>Active</th>
                 <th>Entry</th>
+                <th>Click to Edit</th>
+                <th>Form Order</th>
                 <th>Type</th>
                 <th>variable_type</th>
                 <th>Default Type</th>
                 <th>Default Value</th>
                 <th>Choices</th>
-                <th>Active</th>
-                <th>Form Order</th>
+                
+               
             </tr>
             {% for entry in entries %}
             <tr>
+
+                <td><input type="checkbox" name="entry_update" value="{{ entry[0] }}" {% if entry[7] == 1 %}checked{% endif %} onchange="updateActive({{ entry[0] }}, this.checked)"></td>
                 <td>{{ entry[1] }}</td>
+                <td><a href="{{ url_for('edit', id=entry[0]) }}">Edit</a></td>
+                <td><input type="text" style="width:50px;" name="form_order" value="{{ entry[8] }}">
+                    <input type="hidden" name="entry_id" value="{{ entry[0] }}">
+                </td>
+
                 <td>{{ entry[2] }}</td>
                 <td>{{ entry[3] }}</td>
                 <td>{{ entry[4] }}</td>
                 <td>{{ entry[5] }}</td>
                 <td>{{ entry[6] }}</td>
-                <td>
-                    <input type="checkbox" name="entry_update" value="{{ entry[0] }}" {% if entry[7] == 1 %}checked{% endif %} onchange="updateActive({{ entry[0] }}, this.checked)">
-                </td>
-                <td><input type="text" name="form_order" value="{{ entry[8] }}">
-                    <input type="hidden" name="entry_id" value="{{ entry[0] }}">
-                </td>
                 
-                <td><a href="{{ url_for('edit', id=entry[0]) }}">Edit</a></td>
+
+                
+                
                 
             </tr>
             {% endfor %}

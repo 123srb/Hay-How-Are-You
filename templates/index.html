@@ -9,15 +9,24 @@
 </head>
 <body>
     <div style="float:right"><a href="/journal_fields">Edit Fields</a></div>
-    <div style="float:left;width:20%;">
+    <div style="float:left; width:20%;">
 
     <table>
     <form method="POST" action="/">
         {{ form.csrf_token }}
         {% for field in form if field.widget.input_type != 'hidden' %}
+            
             <tr>
                 <th>{{ field.label }}</th>
-                <th>{{ field }}</th> 
+
+                <th>
+                    {% if field.type == 'BooleanField' %}
+                    <input id="{{ field.id }}" name="{{ field.name}}" required type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                    {% else %}
+                        {{ field }}
+                    {% endif %}
+                
+                </th> 
                 <th>{{trend_dict[field.label.text]}}</th>
             
 
@@ -41,7 +50,7 @@
     </div>
 
     
-    <div style="float:left;width:60%;">
+    <div style="float:left; width:60%;">
         
         <label for="select_column">Select a column:</label>
         <select id="select_column">
