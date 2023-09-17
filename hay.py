@@ -21,7 +21,7 @@ import plotly.express as px
 import io
 import ast
 import os
-
+import re
 from wtforms.widgets import CheckboxInput
 
 class CheckmarkWidget(CheckboxInput):
@@ -43,33 +43,34 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret_key' # Change this to a strong, random value
 app.config['DATABASE'] = 'journal.db'
 
-#create the path to where the file is, and create the database if it doesn't exist
-current_directory = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(current_directory, app.config['DATABASE'])
-conn = sqlite3.connect(db_path)
-c = conn.cursor()
+with app.app_context():
+    #create the path to where the file is, and create the database if it doesn't exist
+    current_directory = os.path.abspath(os.path.dirname(__file__))
+    db_path = os.path.join(current_directory, app.config['DATABASE'])
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
 
-# Create journal if it does not exist
-c.execute('''CREATE TABLE IF NOT EXISTS journal (
-          id INTEGER PRIMARY KEY, 
-          date_time_stamp TEXT, 
-          for_date TEXT, 
-          entry TEXT, 
-          value TEXT, 
-          value_data_type TEXT)''')
+    # Create journal if it does not exist
+    c.execute('''CREATE TABLE IF NOT EXISTS journal (
+            id INTEGER PRIMARY KEY, 
+            date_time_stamp TEXT, 
+            for_date TEXT, 
+            entry TEXT, 
+            value TEXT, 
+            value_data_type TEXT)''')
 
-c.execute( """CREATE TABLE IF NOT EXISTS entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    entry TEXT NOT NULL,
-    type TEXT NOT NULL,
-    variable_type TEXT NOT NULL,
-    default_type TEXT,
-    default_value TEXT,
-    choices TEXT, 
-    active INTEGER DEFAULT 1,
-    form_order INTEGER );""")
+    c.execute( """CREATE TABLE IF NOT EXISTS entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entry TEXT NOT NULL,
+        type TEXT NOT NULL,
+        variable_type TEXT NOT NULL,
+        default_type TEXT,
+        default_value TEXT,
+        choices TEXT, 
+        active INTEGER DEFAULT 1,
+        form_order INTEGER );""")
 
-conn.close()
+    conn.close()
 
 
 # Define a form for editing and adding rows
@@ -88,9 +89,20 @@ def check_entry_data(data):
     if data['type'] in ['SelectField', 'RadioField']:
         try: 
             choices_list_tuple_list = ast.literal_eval(data['choices'])
+            if all(isinstance(item, tuple) and len(item) == 2 for item in choices_list_tuple_list):
+                pass
+            else:
+                message = 'Sorry, but this does not to be in the right format, please look over the choices below and try again'
+                return message
         except:
-            message = 'Sorry, but this does not to be in the right format, please look over the options below and try again'
+            message = 'Sorry, but this does not to be in the right format, please look over the choices below and try again'
             return message
+        pattern = r"\([^)]+\)(?!\s*,\s*\()"
+        if re.search(pattern, ''.join(data['choices'].split())):
+            pass
+        else:
+            message = f"check the formating of your choices"
+
         if len(choices_list_tuple_list) <= 1:
             message = 'It looks like you do not have multiple values in your choices, please separate each value with a comma'
             return message
@@ -190,20 +202,11 @@ def create_form_class(date_to_load):
         latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
         latest_data = pd.read_sql_query(latest_query, conn)
         latest_data = ef.decrypt_df(latest_data, ['entry','value','value_data_type'])
-    #validators_list = [DataRequired()]
 
     for field_name, field_data in form_fields.items():
-        #print(field_data)
-        print('-----------------')
-        
         if ((field_name in date_to_load_columns) or (not latest_data.empty)) or latest_data.empty:
             #Set the default field information for the form
             field_type = getattr(wtforms, field_data['type'])
-            #validator_names = [validator.strip() for validator in field_data['validators'].split(',')]
-            #validators_list = [validator_mapping[name] for name in validator_names]
-
-
-          #  print(validators_list)
             field_args = {
                 'label': field_name,
                 'validators': [DataRequired()],
@@ -228,23 +231,21 @@ def create_form_class(date_to_load):
 
             #We need to seperate Select and Radio fields because they have a choice field 
             if field_data['type'] == 'SelectField' or field_data['type'] == 'RadioField':
-                choices_strings = form_fields['choices'].strip('()').split(', ')
-                choices_tuple = [tuple(t.split(', ')) for t in choices_strings]
-                field_args['choices'] = [choices_tuple] 
-                # field_args['choices'] = [(k, v) for k, v in field_data['choices'][0].items()]
-                #field_args['choices'] = field_data['choices']
+                #adding a little fallback logic hear just in case I missed soemthing and an erroneuous value gets through, otherwise flask will crash
+                try:
+                    choices_tuple = ast.literal_eval(f"[{field_data['choices']}]")
+                except:
+                    choices_tuple = [('error','error'),('error','error')]
+
+                field_args['choices'] = choices_tuple 
+ 
              #Create field and add to form
             field = field_type(**field_args)
-
-
-            
-            print(field)
             setattr(DynamicForm, field_name, field)
     conn.close()
 
     #Regardless of what's in the form we're going to include a date selection.  Populate it with a date if we selected one
     #or default to today
-
     if date_to_load: 
         default_date=date_to_load
     else: 
@@ -258,16 +259,12 @@ def create_form_class(date_to_load):
 
     #we'll use the date to load columns values to find what values we should delete
     return DynamicForm, date_to_load_columns
-
-
-
      
 @app.route('/', methods=['GET', 'POST'])
 def form():
     message = ''
     entry_settings = af.get_entries()
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
-        print(entry_settings)
+
     #check get, and then the form for the selected date, if neither are set default to todays date
     if request.args.get('selected_date'):
         raw_date = request.args.get('selected_date')
@@ -305,30 +302,16 @@ def form():
         conn.commit()
 
         for field in form: 
-            print('-----' + str(field.name) + ' ' + str(field.data))
-       
-        
-
             #check if the values name is in the form, and there is data for it.  
             #csrf token gets automatically passed so we dont want that or our selected date because we use that for the field
             #finally this last if is to check if the field name is one of the columns we deleted for editing a day or has no information as in a new day
             
             #if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and (field.name in columns_to_delete or not columns_to_delete) :
             if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date':
-                print('passed ' + str(field.name))
-
-                try:
-                    
+                try: 
                     c = conn.cursor()
-                    #row_insert_query = f"INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES ({str(datetime.now())}, {selected_date.date()}, {ef.encrypt_value(field.name)},{ef.encrypt_value(field.data)},{ef.encrypt_value(entry_settings[field.name]['value_data_type'])})"
-                    #print(row_insert_query)
-                    #c.execute("INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?, ?, ?, ?,?)", (str(datetime.now()),selected_date.date(),ef.encrypt_value(field.name), ef.encrypt_value(field.data), ef.encrypt_value(field.value_data_type)))
                     row_insert_query = "INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?,?,?,?,?)"
                     values = (str(datetime.now()), selected_date.date(), ef.encrypt_value(field.name),ef.encrypt_value(field.data),ef.encrypt_value(entry_settings[entry_settings['entry'] == field.name]['variable_type'].values[0]))
-                    print('999999999')
-                    print(row_insert_query)
-                    print(values)
-
                     c.execute(row_insert_query, values) 
                     conn.commit()
                 except:
@@ -348,24 +331,37 @@ def form():
 
 @app.route('/update_graph', methods=['POST'])
 def update_graph():
-
-    df = af.pivot_data(af.get_x_days_data(30))
-    selected_column = request.form['selected_column']
-    df.sort_values(by='for_date', ascending=True, inplace=True)
-    df['for_date'] = df['for_date'].dt.strftime('%Y-%m-%d')
-    # Create a Plotly figure
-    fig = px.line(df, x='for_date', y=selected_column, title=f'{selected_column} Over Time')
-    #have the chart interpret/order the x axis correctly
-    fig.update_layout(autotypenumbers='convert types', autosize=True)
-    #format x axis
-    fig.update_xaxes(
-    tickvals=df['for_date'],  # Use the 'for_date' column as tick values
-    ticktext=df['for_date']   # Use the 'for_date' column as tick labels
-    )
-    # Convert the figure to JSON
-    graph_json = fig.to_json()
     
-    return jsonify(graph_json)
+    try:
+        df = af.pivot_data(af.get_x_days_data(30))
+        
+        # Check if the DataFrame is empty
+        if df.empty:
+            return jsonify({'error': 'No data available for the selected period'})
+        
+        selected_column = request.form['selected_column']
+        df.sort_values(by='for_date', ascending=True, inplace=True)
+        df['for_date'] = df['for_date'].dt.strftime('%Y-%m-%d')
+        
+        # Create a Plotly figure
+        fig = px.line(df, x='for_date', y=selected_column, title=f'{selected_column} Over Time')
+        
+        # Have the chart interpret/order the x-axis correctly
+        fig.update_layout(autotypenumbers='convert types', autosize=True)
+        
+        # Format x-axis
+        fig.update_xaxes(
+            tickvals=df['for_date'],  # Use the 'for_date' column as tick values
+            ticktext=df['for_date']   # Use the 'for_date' column as tick labels
+        )
+        
+        # Convert the figure to JSON
+        graph_json = fig.to_json()
+        
+        return jsonify(graph_json)
+    except Exception as e:
+        # Handle any unexpected errors gracefully
+        return jsonify({'error': str(e)})
 
 @app.route('/download_file')
 def download_file():
@@ -406,7 +402,6 @@ def update_active():
         cursor = conn.cursor()
         # Get the list of entry IDs and their new "active" status from the form
         entry_updates = request.form.getlist('entry_update')
-
         
         cursor.execute("UPDATE entries SET active=0")
         for entry_id in entry_updates:
@@ -448,10 +443,9 @@ def add():
     message = ''
     decrypted_entries = af.get_entries()
 
-
     current_var_names = decrypted_entries.entry.unique()
 
-    #Get the first unused value to add for the form order, that way we can give thing we want to show at the bottom large numbers
+    #Get the first unused value to add for the form order, that way we can give things we want to show at the bottom large numbers
     sorted_form_order = sorted(decrypted_entries['form_order'])
     first_unused_order_num = None
     if not sorted_form_order:
@@ -469,12 +463,15 @@ def add():
         data = form.data
         
         message = check_entry_data(data)
+        data['choices'] = ''.join(data['choices'].split())
         
+
         if data['entry'] in current_var_names:
             message = 'Sorry, it looks like you already have another variable with this name!'
 
         if message != '':
             return render_template('add.html', form=form, result_message=message)
+
 
 
         conn = sqlite3.connect(app.config['DATABASE'])
