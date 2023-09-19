@@ -5,30 +5,82 @@
 
         
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> 
+    <style>
+        table {
+            border-collapse: collapse;
+            table-layout: fixed
+            
+        }
+
+        th, td {
+            
+            padding: 8px;
+            text-align: left;
+        }
+
+        /* Apply nowrap to specific cells */
+        .nowrap-cell {
+            white-space: nowrap;
+        }
+    </style>
         
 </head>
 <body>
     <div style="float:right"><a href="/journal_fields">Edit Fields</a></div>
-    <div style="float:left; width:20%;">
+    <div style="float:left; width:30%;">
 
     <table>
     <form method="POST" action="/">
         {{ form.csrf_token }}
-        {% for field in form if field.widget.input_type != 'hidden' %}
-            
-            <tr>
-                <th>{{ field.label }}</th>
 
-                <th>
-                    {% if field.type == 'BooleanField' %}
-                    <input id="{{ field.id }}" name="{{ field.name}}" required type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
-                    {% else %}
-                        {{ field }}
+        {% set bns = namespace(boolean_line_count = 0) %}
+        {% set previous_value = '' %}
+
+        {% for field in form if field.widget.input_type != 'hidden' %} 
+        
+        
+            
+           
+
+        
+                    {% if field.type == 'BooleanField' and bns.boolean_line_count == 0 %}
+                    <tr>
+                    <td colspan = "3" class="nowrap-cell">
+                        {{ field.label }}
+                        <input id="{{ field.id }}" name="{{ field.name}}" required type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        {{trend_dict[field.label.text]}}
+                        {% set bns.boolean_line_count = 1 %}
+
+                    {% elif field.type == 'BooleanField' and bns.boolean_line_count == 1 %}
+                        {{ field.label }}
+                        <input id="{{ field.id }}" name="{{ field.name}}" required type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        {{trend_dict[field.label.text]}}
+                        {% set bns.boolean_line_count = bns.boolean_line_count + 1 %}
+
+                    {% elif field.type == 'BooleanField' and bns.boolean_line_count == 2 %}
+                        {{ field.label }}
+                        <input id="{{ field.id }}" name="{{ field.name}}" required type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        {{trend_dict[field.label.text]}}
+                        </td>
+                    </tr>
+                        {% set bns.boolean_line_count = 0 %}
+                        {% set previous_value = '' %}
+                        
+                    {% elif field.type != 'BooleanField' %}
+                        </td>
+                    </tr>
+                        {% set boolean_line_count = 0 %}
+                    {% endif %}
+
+
+                    {% if field.type != 'BooleanField' %}
+                    <tr>
+                        <th>{{ field.label }}</th>
+                        <th>{{ field }}</th>
+                        <th>{{trend_dict[field.label.text]}}</th>
+                    </tr>
                     {% endif %}
                 
-                </th> 
-                <th>{{trend_dict[field.label.text]}}</th>
-            
 
                 {% if field.errors %}
                     <ul>
@@ -38,16 +90,23 @@
                     </ul>
                 {% endif %}
 
-                </tr>
+                
+               
         {% endfor %}
+
+ 
+
         <tr>
             <td colspan="3">
                 <input type="submit" value="Submit">
             </td>
         </tr>  
     </form>
+        
     </table>
     </div>
+
+
 
     
     <div style="float:left; width:60%;">
