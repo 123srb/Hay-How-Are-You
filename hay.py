@@ -237,8 +237,11 @@ def create_form_class(date_to_load):
                 except:
                     choices_tuple = [('error','error'),('error','error')]
 
-                field_args['choices'] = choices_tuple 
- 
+                field_args['choices'] = choices_tuple
+
+            elif field_data['type'] == 'BooleanField':
+                field_args['validators'] = []
+                 
              #Create field and add to form
             field = field_type(**field_args)
             setattr(DynamicForm, field_name, field)

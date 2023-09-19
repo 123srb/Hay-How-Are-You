@@ -47,19 +47,19 @@
                     <tr>
                     <td colspan = "3" class="nowrap-cell">
                         {{ field.label }}
-                        <input id="{{ field.id }}" name="{{ field.name}}" required type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
                         {{trend_dict[field.label.text]}}
                         {% set bns.boolean_line_count = 1 %}
 
                     {% elif field.type == 'BooleanField' and bns.boolean_line_count == 1 %}
                         {{ field.label }}
-                        <input id="{{ field.id }}" name="{{ field.name}}" required type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
                         {{trend_dict[field.label.text]}}
                         {% set bns.boolean_line_count = bns.boolean_line_count + 1 %}
 
                     {% elif field.type == 'BooleanField' and bns.boolean_line_count == 2 %}
                         {{ field.label }}
-                        <input id="{{ field.id }}" name="{{ field.name}}" required type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
                         {{trend_dict[field.label.text]}}
                         </td>
                     </tr>
