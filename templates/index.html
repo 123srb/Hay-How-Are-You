@@ -45,21 +45,21 @@
         
                     {% if field.type == 'BooleanField' and bns.boolean_line_count == 0 %}
                     <tr>
-                    <td colspan = "3" class="nowrap-cell">
+                    <td colspan = "3" class="nowrap-cell"> 
                         {{ field.label }}
-                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox"  {% if field.default == 'True' %}checked{% endif %}>
                         {{trend_dict[field.label.text]}}
                         {% set bns.boolean_line_count = 1 %}
 
                     {% elif field.type == 'BooleanField' and bns.boolean_line_count == 1 %}
                         {{ field.label }}
-                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox"  {% if field.default == 'True' %}checked{% endif %}>
                         {{trend_dict[field.label.text]}}
                         {% set bns.boolean_line_count = bns.boolean_line_count + 1 %}
 
-                    {% elif field.type == 'BooleanField' and bns.boolean_line_count == 2 %}
+                    {% elif field.type == 'BooleanField' and bns.boolean_line_count == 2 %}                      
                         {{ field.label }}
-                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox" value="{{ field.default }}" {% if field.default == 'True' %}checked=""{% endif %}>
+                        <input id="{{ field.id }}" name="{{ field.name}}" type="checkbox"  {% if field.default == 'True' %}checked{% endif %}>
                         {{trend_dict[field.label.text]}}
                         </td>
                     </tr>
@@ -161,6 +161,22 @@
                 var iframe = document.getElementById('download-frame');
                 iframe.src = '/download_file';
             });
+
+
+        // Add an event listener to the select element
+        
+        document.addEventListener("DOMContentLoaded", function() {
+            const dateInput = document.getElementById("selected_date");
+              
+            dateInput.addEventListener("change", function() {
+                const selectedDate = dateInput.value;
+                const baseUrl = window.location.href.split('?')[0];  // Get the base URL without query parameters
+                const url = `${baseUrl}?selected_date=${selectedDate}`;
+                window.location.href = url;
+            });
+        });
+       
+        
         </script>
 </body>
 </html>

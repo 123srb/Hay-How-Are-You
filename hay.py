@@ -137,8 +137,8 @@ def check_entry_data(data):
 #'Boolean fields Need to be Boolean        
     if data['type'] == 'BooleanField':
         if  (data['default_type']=='Default Value'):
-            if (data['default_value'] not in ['True', 'False']):
-                message = 'Your default value for a Boolean can only be True or False'
+            if (data['default_value'] not in ['1', '0']):
+                message = 'Your default value for a Boolean can only be 1 or 0'
 
 #string can't be numbers, but really it would probably still work because strings are numbers by default
     elif data['variable_type'] == 'String':
@@ -191,6 +191,7 @@ def create_form_class(date_to_load):
             #load data from the specified day into a df
             date_to_load_data = ef.decrypt_df(date_to_load_data, ['entry','value','value_data_type'])
             date_to_load_columns = date_to_load_data.entry.unique()
+            print(date_to_load_data)
         else:
         # Get the data from the database using pandas
             latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
@@ -219,7 +220,11 @@ def create_form_class(date_to_load):
                 #If a new form entry is added, there is data for the day and the value is in our form_entries
                 #but there is no data for that form value so it would be an error
                 try:
+                    print('loaded')
+                    print(field_name)
+
                     field_args['default'] = date_to_load_data.loc[date_to_load_data['entry']==field_name, 'value'].values[0]
+                    print(field_args['default'])
                 except:
                     pass
             #if the form field is supposed to load the last value, query it
@@ -227,6 +232,9 @@ def create_form_class(date_to_load):
                 c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_name,))
                 row = c.fetchone()
                 if row != None:
+                    print(field_name)
+                    print(row[0])
+                    print('-------------------')
                     field_args['default'] = row[0]
 
             #We need to seperate Select and Radio fields because they have a choice field 
@@ -239,8 +247,9 @@ def create_form_class(date_to_load):
 
                 field_args['choices'] = choices_tuple
 
-            elif field_data['type'] == 'BooleanField':
-                field_args['validators'] = []
+   
+                    
+
                  
              #Create field and add to form
             field = field_type(**field_args)
@@ -310,7 +319,7 @@ def form():
             #finally this last if is to check if the field name is one of the columns we deleted for editing a day or has no information as in a new day
             
             #if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date' and (field.name in columns_to_delete or not columns_to_delete) :
-            if field.name in form and field.data  and field.name != 'csrf_token' and field.name != 'selected_date':
+            if field.name in form and (field.data or field.type=='BooleanField') and field.name != 'csrf_token' and field.name != 'selected_date':
                 try: 
                     c = conn.cursor()
                     row_insert_query = "INSERT INTO journal (date_time_stamp, for_date, entry, value, value_data_type) VALUES (?,?,?,?,?)"
@@ -349,6 +358,8 @@ def update_graph():
         # Create a Plotly figure
         fig = px.line(df, x='for_date', y=selected_column, title=f'{selected_column} Over Time')
         
+        df[selected_column]     
+
         # Have the chart interpret/order the x-axis correctly
         fig.update_layout(autotypenumbers='convert types', autosize=True)
         
@@ -357,7 +368,15 @@ def update_graph():
             tickvals=df['for_date'],  # Use the 'for_date' column as tick values
             ticktext=df['for_date']   # Use the 'for_date' column as tick labels
         )
+
+        # Dynamically retrieve Y-axis categories and sort them
+        category_order = df[selected_column].unique()
+        category_order.sort()  # Sort the categories
         
+        # Then, set the categoryorder parameter to match your sorted list
+        fig.update_yaxes(categoryorder="array", categoryarray=category_order)
+      
+
         # Convert the figure to JSON
         graph_json = fig.to_json()
         
