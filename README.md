@@ -14,7 +14,9 @@ It currently uses Fernet encryption for stored values, but I may change that lat
 When first run, it will create a key file to encrypt and decrypt your data in your Documents folder (at some point I'll add the ability to specify location)
 
 From there you need to create the fields you want in your form by clicking on "Edit Fields" in the upper right.  At first this will be empty, but when you click on add, you can add an entry like these examples:
+
 ![Add](https://github.com/123srb/Hay-How-Are-You/assets/17171696/cc14344e-ff03-4a1f-8fbe-0b4857a785a4)
+
 ![Add 2](https://github.com/123srb/Hay-How-Are-You/assets/17171696/bef27e07-ab9a-47f0-a79a-330c59d12094)
 
 You also have the option to Edit variables.  I don't recomended using this too much.  Changing a field name or variable type will not change the data that is saved in your journal entries.  You can delete an entry from here
