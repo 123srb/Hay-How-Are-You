@@ -3,6 +3,10 @@
 
 I wanted a program I could use from a Dropbox of Drive that I could do journalling in securely, still be able to customize, and relatively easily access the date for data science analysis.  
 
+But most importantly, I wanted it to be fast to fill out
+* The application lets you set any variable to have a default value to load, load the previously submitted value, or have no default.  If you already have data for that day, it will load that data
+* You won't need to take you hands off the keyboard, type in your selection or choose it with your arrow keys then tab to the next value.
+
 It currently uses Fernet encryption for stored values, but I may change that later, I haven't done too much research on Python encryption but it seems suggested..
 
 
