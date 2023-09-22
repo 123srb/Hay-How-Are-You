@@ -19,11 +19,11 @@ From there you need to create the fields you want in your form by clicking on "E
 
 ![Add 2](https://github.com/123srb/Hay-How-Are-You/assets/17171696/bef27e07-ab9a-47f0-a79a-330c59d12094)
 
-You also have the option to Edit variables.  I don't recomended using this too much.  Changing a field name or variable type will not change the data that is saved in your journal entries.  You can delete an entry from here
+You also have the option to Edit fields.  I don't recomended using this too much.  Changing a field name or variable type will not change the data that is saved in your journal entries.  You can delete a field from here
 
 ![Edit](https://github.com/123srb/Hay-How-Are-You/assets/17171696/ae756faf-8164-44d3-9159-8cdac3ab481d)
 
-After saving all your entries, you have a few options.  You can order where those fields show up in your form, and choose which fields show up.
+After saving all your entries, you have a few options.  You can order where those fields show up in your form, and choose which fields show up.  You'll notice I gave some variable very large numbers that way they will always show up at the bottom even if I add more later.
 
 ![Journal Entries](https://github.com/123srb/Hay-How-Are-You/assets/17171696/50032a39-3df2-4656-9e30-b9d15d3beee6)
 
