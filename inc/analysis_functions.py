@@ -86,13 +86,15 @@ def get_trending_dictionary():
     df = get_x_days_data(14)   
     
     df = df[df['value_data_type'].isin(['Integer','Binary'])]
+    df.replace({'False': 0, 'True': 1}, inplace=True)
 
     #Just in case somehow a string gets through we don't want the whole system to become unusable
     df['value'] = df['value'].apply(lambda x: 0 if isinstance(x, str) else x)
 
     #Get all unique variable names in the data frame
     variable_names = df.entry.unique()
-
+    print(df)
+    
     
     for name in variable_names:
         #filter df for one specific entry
@@ -111,6 +113,7 @@ def get_trending_dictionary():
         model.fit(x,y)
         slope = model.coef_[0]
         result_dict[name] = round(slope,3)
+        print(slope)
 
     return(result_dict)
 

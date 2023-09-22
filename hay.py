@@ -80,24 +80,28 @@ class EntryForm(FlaskForm):
     variable_type = SelectField('Variable Type', choices=[('String', 'Text'), ('Binary', 'Yes or No'), ('Integer', 'Numeric')] ) 
     default_type = SelectField('Default Type',  choices=[('Empty', 'Empty'), ('Default Value', 'Default Value'), ('Load Previous Value', 'Load Previous Value')] )
     default_value = StringField('Default Value')
-    choices = StringField('Choices')
+    choices = TextAreaField('Choices')
 
 def check_entry_data(data):
 #Add some error checking
 #Check to make sure Select and Radio Fields have a correct number items in their choices and that the variable type matches
     message = ''
     if data['type'] in ['SelectField', 'RadioField']:
+        print(data['choices'])
+        data['choices'] = re.sub(r'\s+(?![^()]*\))', '',  data['choices'])
+        print(data['choices'])
         try: 
             choices_list_tuple_list = ast.literal_eval(data['choices'])
             if all(isinstance(item, tuple) and len(item) == 2 for item in choices_list_tuple_list):
                 pass
             else:
-                message = 'Sorry, but this does not to be in the right format, please look over the choices below and try again'
+                message = 'Sorry, but this does not to be in the right format, please look over the choices below and try again couldnt convert'
                 return message
         except:
             message = 'Sorry, but this does not to be in the right format, please look over the choices below and try again'
             return message
         pattern = r"\([^)]+\)(?!\s*,\s*\()"
+        
         if re.search(pattern, ''.join(data['choices'].split())):
             pass
         else:
@@ -191,7 +195,7 @@ def create_form_class(date_to_load):
             #load data from the specified day into a df
             date_to_load_data = ef.decrypt_df(date_to_load_data, ['entry','value','value_data_type'])
             date_to_load_columns = date_to_load_data.entry.unique()
-            print(date_to_load_data)
+            
         else:
         # Get the data from the database using pandas
             latest_query = 'SELECT * FROM journal WHERE for_date = (SELECT MAX(for_date) FROM journal)'
@@ -232,9 +236,6 @@ def create_form_class(date_to_load):
                 c.execute("SELECT value FROM journal WHERE entry=? ORDER BY id DESC LIMIT 1", (field_name,))
                 row = c.fetchone()
                 if row != None:
-                    print(field_name)
-                    print(row[0])
-                    print('-------------------')
                     field_args['default'] = row[0]
 
             #We need to seperate Select and Radio fields because they have a choice field 
@@ -335,6 +336,7 @@ def form():
         pass
     #get the value for how each number valued has be trending up of down
     trend_dict = af.get_trending_dictionary()
+    print(trend_dict)
     
 
     return render_template('index.html', form=form, result_message = message, trend_dict=trend_dict, selected_date = selected_date, columns=af.get_x_days_data(30, ['entry']).entry.unique())
@@ -485,7 +487,8 @@ def add():
         data = form.data
         
         message = check_entry_data(data)
-        data['choices'] = ''.join(data['choices'].split())
+        #data['choices'] = ''.join(data['choices'].split())
+        data['choices'] = re.sub(r'\s+(?![^()]*\))', '',  data['choices'])
         
 
         if data['entry'] in current_var_names:
@@ -531,7 +534,9 @@ def edit(id):
         # Update the entry in the database
         data = form.data
         message = ''
+        data['choices'] = re.sub(r'\s+(?![^()]*\))', '',  data['choices'])
         message = check_entry_data(data)
+
 
         if message != '':
             return render_template('edit.html', form=form, result_message=message)

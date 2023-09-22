@@ -9,24 +9,24 @@
     <form method="POST">
         {{ form.csrf_token }}
         <label for="entry">Entry:</label>
-        {{ form.entry.label }}
+     
         {{ form.entry }}
         <br>
         <label for="type">Type:</label>
-        {{ form.type.label }}
+       
         {{ form.type }}
         <br>
         <label for="variable_type">Type:</label>
-        {{ form.variable_type.label }}
+    
         {{ form.variable_type }}
         <br>
         <label for="default_type">Default Type:</label>
-        {{ form.default_type.label }}
+       
         {{ form.default_type }}
         <br>
         <div class="form-group" id="default_value-container" style="display: none;">
             <label for="default_value">Default Value:</label>
-            {{ form.default_value.label }}
+     
             {{ form.default_value }}
 
             {% if form.default_value.errors %}
@@ -40,7 +40,7 @@
         <br>
         <div class="form-group" id="choices-container" style="display: none;">
             <label for="choices">Choices:</label>
-            {{ form.choices.label }}
+         
             {{ form.choices }}
             <p> Format your choices like this or just copy paste:</p>
             <p> Yes or No:  ('0', 'No'), ('1', 'Yes')</p>
