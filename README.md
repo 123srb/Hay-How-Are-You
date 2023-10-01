@@ -9,6 +9,15 @@ But most importantly, I wanted it to be fast to fill out
 
 It currently uses Fernet encryption for stored values, but I may change that later, I haven't done too much research on Python encryption but it seems suggested..
 
+#Entry Philosophy
+You have a few different methods of entry for your journal, here are my thoughts for the use of each
+* StringField - For short, text entries.  Word of the Day, short thoughts, etc 
+* TextAreaField - A larger, adjustable text box.  Suitable for Journal Entries
+* BooleanField - A checkbox, use it for yes or no items.  Great for tracking medicines that are taken every day, or tracking individual symptoms
+* SelectField - Clicking on this will open a drop down list of choices.  Best for items in a list, how are you from a scale from 1 to 10?  Which hobby from a list did you work on today?
+* RadioField - Same as SelectField, except it displays all of the choices as radio fields.  The spare you a click, but takes up a lot more space than SelectField
+* IntegerField - Takes an integer as a value.  How long did you exercise today?  What dosage of medicine did you take?
+* DecimalField - The same as Integer except it takes decimals.
 
 # Basic Use
 When first run, it will create a key file to encrypt and decrypt your data in your Documents folder (at some point I'll add the ability to specify location)
