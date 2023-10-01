@@ -29,7 +29,7 @@ After saving all your entries, you have a few options.  You can order where thos
 
 If you put two or three checkboxes next to each other, they we fall into the same row to save space.
 
-With all that we can now utilize our journal:
+With all that we can now utilize our journal by filling it out and clicking submit.  If you want to edit an entry or enter for a missed day, change the Selected Date.  If you are editing an entry, only the entries that existed on that day will be there.
 ![image](https://github.com/123srb/Hay-How-Are-You/assets/17171696/15043ce9-9ae5-4465-82b9-f0ed01e3e05a)
 The number to the right of each entry is a two week trend to see if numeric values are increasing or decreasing on average (Just using the slope of a linear regression)
 To the right of your values is a graph that you can switch between your values to visualize your trends over time.
